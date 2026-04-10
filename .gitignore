@@ -1,0 +1,17 @@
+# Neovim
+*.log
+*.swp
+*.swo
+undo/
+swap/
+backup/
+
+# Lazy.nvim
+/lazy-lock.json
+
+# LazyChad State (private choices)
+*_picker_state.json
+
+# Folders
+.netrw*
+.DS_Store
