@@ -98,12 +98,19 @@ function M.choose_for_filetype(ft, priority_delay)
           local builtins = utils.get_builtins(ft, "Formatter")
           if vim.list_contains(builtins, tool) then
             set_formatter(ft, tool)
+            vim.notify("LazyChad: " .. tool .. " set as formatter for " .. ft .. " (Format on Save enabled)", vim.log.levels.INFO)
           else
             utils.ensure_installed(package_name_for(tool), "formatter", tool, function()
               set_formatter(ft, tool)
+              vim.notify("LazyChad: " .. tool .. " installed and set as formatter for " .. ft .. " (Format on Save enabled)", vim.log.levels.INFO)
             end)
           end
+        else
+          local ok, conform = pcall(require, "conform")
+          if ok then conform.formatters_by_ft[ft] = nil end
+          vim.notify("LazyChad: Formatter disabled for " .. ft, vim.log.levels.INFO)
         end
+
       end)
     end
 

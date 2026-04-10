@@ -106,12 +106,19 @@ function M.choose_for_filetype(ft, priority_delay)
           local builtins = utils.get_builtins(ft, "Linter")
           if vim.list_contains(builtins, tool) then
             set_linter(ft, tool)
+            vim.notify("LazyChad: " .. tool .. " set as linter for " .. ft, vim.log.levels.INFO)
           else
             utils.ensure_installed(package_name_for(tool), "linter", tool, function()
               set_linter(ft, tool)
+              vim.notify("LazyChad: " .. tool .. " installed and set as linter for " .. ft, vim.log.levels.INFO)
             end)
           end
+        else
+          local ok, lint = pcall(require, "lint")
+          if ok then lint.linters_by_ft[ft] = nil end
+          vim.notify("LazyChad: Linter disabled for " .. ft, vim.log.levels.INFO)
         end
+
       end)
     end
 
