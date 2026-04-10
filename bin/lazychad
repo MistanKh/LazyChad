@@ -9,8 +9,6 @@ SYSTEM_DIR="/usr/share/lazychad"
 
 # First-time setup: Seed the user's config directory
 if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
-    echo "🚀 Initializing LazyChad in $LAZYCHAD_DIR..."
-    
     # Check if installed via system package manager
     if [ -d "$SYSTEM_DIR" ]; then
         mkdir -p "$LAZYCHAD_DIR"
@@ -26,6 +24,5 @@ if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
 fi
 
 # Run Neovim and pass all arguments ($@)
-echo "⚡ Booting LazyChad [NVIM_APPNAME=$NVIM_APPNAME]..."
 export NVIM_APPNAME="LazyChad"
 exec nvim "$@"
