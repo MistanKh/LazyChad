@@ -4,5 +4,25 @@
 # Set the AppName so it stays isolated
 export NVIM_APPNAME="LazyChad"
 
+LAZYCHAD_DIR="$HOME/.config/LazyChad"
+SYSTEM_DIR="/usr/share/lazychad"
+
+# First-time setup: Seed the user's config directory
+if [ ! -d "$LAZYCHAD_DIR" ]; then
+    echo "🚀 Initializing LazyChad in $LAZYCHAD_DIR..."
+    
+    # Check if installed via system package manager
+    if [ -d "$SYSTEM_DIR" ]; then
+        mkdir -p "$LAZYCHAD_DIR"
+        cp -a "$SYSTEM_DIR/." "$LAZYCHAD_DIR/"
+    else
+        # Fallback for manual/standalone script usage
+        echo "❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR"
+        echo "If you installed manually, please clone the repository there:"
+        echo "git clone https://github.com/MistanKh/LazyChad $LAZYCHAD_DIR"
+        exit 1
+    fi
+fi
+
 # Run Neovim and pass all arguments ($@)
 exec nvim "$@"
