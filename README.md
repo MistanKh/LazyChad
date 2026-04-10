@@ -33,19 +33,29 @@ git clone https://github.com/MistanKh/LazyChad ~/.config/nvim
 ```bash
 nvim
 ```
-Sit back, relax, and let the AI-powered logic do the rest.
 
 ---
 
-## 🛠️ How the Toolchain Works
+## 🛠️ Post-Installation
 
-LazyChad introduces three powerful commands to manage your environment:
+Once you've launched LazyChad for the first time, follow these steps:
 
-- `:LspPick`: Scan Mason for every compatible LSP for your current file and choose one.
-- `:FormatPick`: Dynamically discover and set your preferred formatter via `conform.nvim`.
-- `:LintPick`: Choose from all available linters supported by `nvim-lint`.
+1.  **Wait for Plugins**: Let `lazy.nvim` finish installing all the core plugins.
+2.  **Bootstrap Essentials**: Run `:MasonInstallAll` to install the base language server and formatter for your Neovim config itself.
+3.  **Open a File**: Open any code file (e.g., `test.js` or `main.py`).
+4.  **Pick Your Tools**: LazyChad will automatically prompt you to choose an LSP, Formatter, and Linter. Make your choice once, and you're set for life.
 
-Once you make a choice, **LazyChad remembers it**. You only have to do it once, because doing things twice is for people who aren't lazy.
+---
+
+## 🗑️ Uninstallation
+
+If you ever want to return to your old life, just run:
+
+```bash
+rm -rf ~/.config/nvim ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
+mv ~/.config/nvim.bak ~/.config/nvim
+mv ~/.local/share/nvim.bak ~/.local/share/nvim
+```
 
 ---
 
