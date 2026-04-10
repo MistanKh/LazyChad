@@ -9,6 +9,7 @@ license=('MIT')
 depends=('neovim' 'git' 'ripgrep' 'bash')
 provides=('lazychad')
 conflicts=('lazychad')
+install=lazychad.install
 source=("git+https://github.com/MistanKh/LazyChad.git")
 sha256sums=('SKIP')
 
