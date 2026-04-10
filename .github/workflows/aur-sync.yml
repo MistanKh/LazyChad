@@ -34,7 +34,7 @@ jobs:
           git config --global --add safe.directory /__w/LazyChad/LazyChad
           
           # Clone AUR repo
-          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_aur" git clone ssh://aur@aur.archlinux.org/lazychad.git aur-repo
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/id_aur -o StrictHostKeyChecking=no" git clone ssh://aur@aur.archlinux.org/lazychad.git aur-repo
           
           # Copy files from GitHub to AUR folder
           cp PKGBUILD aur-repo/
@@ -53,5 +53,5 @@ jobs:
             echo "No changes to commit"
           else
             git commit -m "bot: sync from github [${{ github.sha }}]"
-            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_aur" git push origin master
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/id_aur -o StrictHostKeyChecking=no" git push origin master
           fi
