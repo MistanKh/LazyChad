@@ -22,10 +22,11 @@ exists() {
 # 1. System Packages (Arch Linux / Pacman)
 echo -e "${BOLD}${YELLOW}[1/4] Checking System Packages (pacman)...${NC}"
 SYSTEM_DEPS=(
-    "nodejs" "npm" "git" "make" 
+    "nodejs" "npm" "git" "make" "unzip" "gcc"
     "python" "python-pip" "python-pipx" 
     "ripgrep" "fd" "lazygit" 
-    "lua51" "luarocks" "wl-clipboard" "xclip"
+    "lua51" "luarocks" "lua-jsregexp"
+    "wl-clipboard" "xclip"
 )
 
 MISSING_DEPS=()
@@ -47,6 +48,7 @@ echo -e "\n${BOLD}${YELLOW}[2/4] Checking Rust Toolchain (rustup)...${NC}"
 if ! exists cargo; then
     echo -e "${BLUE}Installing Rust via rustup...${NC}"
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    # shellcheck source=/dev/null
     source "$HOME/.cargo/env"
 else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
@@ -54,19 +56,24 @@ fi
 
 # 3. Global NPM Packages
 echo -e "\n${BOLD}${YELLOW}[3/4] Checking Node.js Providers...${NC}"
+# We check if the 'neovim' package is installed globally
 if ! npm list -g neovim >/dev/null 2>&1; then
     echo -e "${BLUE}Installing global npm package: neovim${NC}"
     sudo npm i -g neovim
+else
+    echo -e "${GREEN}✅ Global npm 'neovim' is already installed.${NC}"
 fi
 
 if ! exists tree-sitter; then
     echo -e "${BLUE}Installing global npm package: tree-sitter-cli${NC}"
     sudo npm i -g tree-sitter-cli
+else
+    echo -e "${GREEN}✅ Global npm 'tree-sitter-cli' is already installed.${NC}"
 fi
-echo -e "${GREEN}✅ Node.js providers are ready.${NC}"
 
 # 4. Python Provider (pynvim)
 echo -e "\n${BOLD}${YELLOW}[4/4] Checking Python Providers (pynvim)...${NC}"
+# Use pipx to install/check pynvim
 if ! pipx list | grep -q "pynvim"; then
     echo -e "${BLUE}Installing pynvim via pipx...${NC}"
     pipx install pynvim --force
