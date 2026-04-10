@@ -1,0 +1,78 @@
+#!/bin/bash
+# LazyChad Dependency Installer
+# Automates the setup of external tools required for a smooth Neovim experience.
+
+set -e
+
+BOLD="\033[1m"
+GREEN="\033[0;32m"
+BLUE="\033[0;34m"
+YELLOW="\033[0;33m"
+RED="\033[0;31m"
+NC="\033[0m" # No Color
+
+echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
+echo -e "This script will check and install system dependencies, Rust, Node, and Python providers.\n"
+
+# Function to check if a command exists
+exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# 1. System Packages (Arch Linux / Pacman)
+echo -e "${BOLD}${YELLOW}[1/4] Checking System Packages (pacman)...${NC}"
+SYSTEM_DEPS=(
+    "nodejs" "npm" "git" "make" 
+    "python" "python-pip" "python-pipx" 
+    "ripgrep" "fd" "lazygit" 
+    "lua51" "luarocks" "wl-clipboard" "xclip"
+)
+
+MISSING_DEPS=()
+for dep in "${SYSTEM_DEPS[@]}"; do
+    if ! pacman -Qs "^$dep$" >/dev/null 2>&1; then
+        MISSING_DEPS+=("$dep")
+    fi
+done
+
+if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
+    echo -e "${BLUE}Installing missing system packages: ${MISSING_DEPS[*]}${NC}"
+    sudo pacman -S --needed --noconfirm "${MISSING_DEPS[@]}"
+else
+    echo -e "${GREEN}✅ All system packages are already installed.${NC}"
+fi
+
+# 2. Rust Toolchain
+echo -e "\n${BOLD}${YELLOW}[2/4] Checking Rust Toolchain (rustup)...${NC}"
+if ! exists cargo; then
+    echo -e "${BLUE}Installing Rust via rustup...${NC}"
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    source "$HOME/.cargo/env"
+else
+    echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
+fi
+
+# 3. Global NPM Packages
+echo -e "\n${BOLD}${YELLOW}[3/4] Checking Node.js Providers...${NC}"
+if ! npm list -g neovim >/dev/null 2>&1; then
+    echo -e "${BLUE}Installing global npm package: neovim${NC}"
+    sudo npm i -g neovim
+fi
+
+if ! exists tree-sitter; then
+    echo -e "${BLUE}Installing global npm package: tree-sitter-cli${NC}"
+    sudo npm i -g tree-sitter-cli
+fi
+echo -e "${GREEN}✅ Node.js providers are ready.${NC}"
+
+# 4. Python Provider (pynvim)
+echo -e "\n${BOLD}${YELLOW}[4/4] Checking Python Providers (pynvim)...${NC}"
+if ! pipx list | grep -q "pynvim"; then
+    echo -e "${BLUE}Installing pynvim via pipx...${NC}"
+    pipx install pynvim --force
+else
+    echo -e "${GREEN}✅ Python provider (pynvim) is already installed.${NC}"
+fi
+
+echo -e "\n${BOLD}${GREEN}✨ Installation Complete!${NC}"
+echo -e "Please restart your terminal and run ${BOLD}:checkhealth${NC} inside LazyChad to verify everything is working perfectly.\n"

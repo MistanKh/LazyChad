@@ -38,7 +38,14 @@ source ~/.bashrc # or ~/.zshrc
 fish_add_path ~/.config/LazyChad/bin
 ```
 
-### 3. Start LazyChad
+### 3. Install Dependencies
+LazyChad requires several background tools (Node.js, Python, Rust, etc.) to power its intelligent features. We provide a built-in script to set everything up automatically:
+```bash
+lazychad-deps
+```
+*(This script will check for missing tools and install them via pacman, npm, and pipx).*
+
+### 4. Start LazyChad
 Now you can launch it using the simple `lazychad` command:
 ```bash
 lazychad
