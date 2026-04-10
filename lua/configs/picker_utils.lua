@@ -104,11 +104,6 @@ function M.get_mason_candidates(ft, category)
   local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return {} end
   
-  if not registry.is_initialized() then
-    -- If not initialized, we can't reliably get packages yet
-    return {}
-  end
-  
   local candidates = {}
   local packages = registry.get_all_packages()
   
