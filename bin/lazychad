@@ -8,13 +8,14 @@ LAZYCHAD_DIR="$HOME/.config/LazyChad"
 SYSTEM_DIR="/usr/share/lazychad"
 
 # First-time setup: Seed the user's config directory
-if [ ! -d "$LAZYCHAD_DIR" ]; then
+if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
     echo "🚀 Initializing LazyChad in $LAZYCHAD_DIR..."
     
     # Check if installed via system package manager
     if [ -d "$SYSTEM_DIR" ]; then
         mkdir -p "$LAZYCHAD_DIR"
-        cp -a "$SYSTEM_DIR/." "$LAZYCHAD_DIR/"
+        # Copy everything, but don't overwrite if files exist (using -n)
+        cp -an "$SYSTEM_DIR/." "$LAZYCHAD_DIR/"
     else
         # Fallback for manual/standalone script usage
         echo "❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR"
