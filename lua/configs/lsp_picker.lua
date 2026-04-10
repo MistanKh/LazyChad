@@ -31,8 +31,28 @@ local function save_state()
 end
 
 local function get_server_specs()
-  if server_specs then return server_specs end
-  local path = vim.fn.stdpath "data" .. "/lazy/nvim-lspconfig/lsp"
+  if server_specs and next(server_specs) then return server_specs end
+  
+  local lspconfig_path = nil
+  local ok_lazy, lazy_config = pcall(require, "lazy.core.config")
+  if ok_lazy and lazy_config.plugins["nvim-lspconfig"] then
+    lspconfig_path = lazy_config.plugins["nvim-lspconfig"].dir
+  else
+    local paths = {
+      vim.fn.stdpath "data" .. "/lazy/nvim-lspconfig",
+      vim.fn.expand "~/.local/share/nvim/lazy/nvim-lspconfig",
+    }
+    for _, p in ipairs(paths) do
+      if vim.fn.isdirectory(p) == 1 then
+        lspconfig_path = p
+        break
+      end
+    end
+  end
+
+  if not lspconfig_path then return {} end
+  
+  local path = lspconfig_path .. "/lsp"
   local files = vim.fn.globpath(path, "*.lua", false, true)
   local specs = {}
   for _, file in ipairs(files) do
@@ -58,13 +78,11 @@ local function package_name_for(server)
   local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return server end
   
-  -- Fast check
   if registry.has_package(server) then 
     package_name_cache[server] = server
     return server 
   end
   
-  -- Fallback search (find package that provides this lspconfig name)
   for _, name in ipairs(registry.get_all_package_names()) do
     local ok, pkg = pcall(registry.get_package, name)
     if ok and pkg and pkg.spec and pkg.spec.neovim and pkg.spec.neovim.lspconfig == server then
@@ -78,12 +96,9 @@ end
 
 local function setup_server(server)
   if setup_servers[server] then return end
-  
-  -- Ensure lspconfig is loaded once to populate vim.lsp.config
   local ok_lsp, lspconfig = pcall(require, "lspconfig")
   if not ok_lsp then return end
   
-  -- NvChad's standard LSP setup (lazily loaded from lspconfig)
   local nv_lsp = require "nvchad.configs.lspconfig"
   local on_attach = nv_lsp.on_attach
   local on_init = nv_lsp.on_init
@@ -94,19 +109,13 @@ local function setup_server(server)
     if config then
       config.on_attach = on_attach
       config.on_init = on_init
-      
-      -- Merge capabilities
       config.capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities)
-      
-      -- Start the server using the new API
       vim.lsp.enable(server)
-      
       setup_servers[server] = true
       return
     end
   end
 
-  -- Fallback if vim.lsp.config is not supported (older Neovim versions)
   local config = lspconfig[server]
   if config then
      config.setup {
@@ -126,10 +135,10 @@ function M.choose_for_filetype(ft)
   if not ft or ft == "" or prompting[ft] then return end
   
   local candidates = utils.get_mason_candidates(ft, "LSP")
-  -- Include builtins (like rust_analyzer)
   vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
   
   if #candidates == 0 then
+    vim.notify("LazyChad: No LSP candidates found for " .. ft, vim.log.levels.WARN)
     return
   end
   
@@ -141,7 +150,7 @@ function M.choose_for_filetype(ft)
   local seen = {}
   
   for _, c in ipairs(candidates) do
-    if not seen[c] and specs[c] then
+    if not seen[c] and (specs[c] or vim.list_contains(utils.get_builtins(ft, "LSP"), c)) then
       seen[c] = true
       local label = c
       if c == recommended then
@@ -154,7 +163,10 @@ function M.choose_for_filetype(ft)
     end
   end
 
-  if #valid == 0 then return end
+  if #valid == 0 then
+    vim.notify("LazyChad: No valid LSP specifications found for " .. ft, vim.log.levels.WARN)
+    return
+  end
 
   prompting[ft] = true
   local items = { "None" }
@@ -188,11 +200,8 @@ end
 local function get_saved_choice(ft)
   local state = load_state()
   if state.filetypes[ft] then return state.filetypes[ft] end
-  
-  -- Check base filetype (e.g., 'javascript' for 'javascript.jsx')
   local base = ft:match("^([^%.]+)")
   if base and state.filetypes[base] then return state.filetypes[base] end
-  
   return nil
 end
 
@@ -241,7 +250,6 @@ function M.setup()
     end,
   })
 
-  -- Immediate check for the current buffer
   vim.schedule(function()
     check_buffer(vim.api.nvim_get_current_buf())
   end)

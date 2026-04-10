@@ -42,6 +42,10 @@ function M.choose_for_filetype(ft)
   local candidates = utils.get_mason_candidates(ft, "Linter")
   vim.list_extend(candidates, utils.get_builtins(ft, "Linter"))
   
+  if #candidates == 0 then
+    return
+  end
+
   local recommended = utils.get_recommendation(ft, "Linter")
   
   local valid = {}
@@ -56,6 +60,7 @@ function M.choose_for_filetype(ft)
         if lint.linters[c] then tool = c
         elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
         elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
+        elseif vim.list_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
         end
 
         if tool then
@@ -73,7 +78,9 @@ function M.choose_for_filetype(ft)
     end
   end
 
-  if #valid == 0 then return end
+  if #valid == 0 then
+    return
+  end
 
   prompting[ft] = true
   local items = { "None" }
@@ -158,7 +165,6 @@ function M.setup()
     end,
   })
 
-  -- Immediate check for the current buffer
   vim.schedule(function()
     check_buffer(vim.api.nvim_get_current_buf())
   end)

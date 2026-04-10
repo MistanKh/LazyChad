@@ -5,24 +5,24 @@ local active = nil
 
 local function close_active()
   if not active then return end
-  if active.win and vim.api.nvim_win_is_valid(active.win) then
-    vim.api.nvim_win_close(active.win, true)
+  local a = active
+  active = nil -- Clear before acting to prevent recursion
+  
+  if a.win and vim.api.nvim_win_is_valid(a.win) then
+    vim.api.nvim_win_close(a.win, true)
   end
-  if active.buf and vim.api.nvim_buf_is_valid(active.buf) then
-    vim.api.nvim_buf_delete(active.buf, { force = true })
+  if a.buf and vim.api.nvim_buf_is_valid(a.buf) then
+    vim.api.nvim_buf_delete(a.buf, { force = true })
   end
-  active = nil
 end
 
 local function run_next()
   if active or #queue == 0 then return end
   
-  -- Set active immediately to prevent race conditions
-  active = { win = nil, buf = nil }
-
   local req = table.remove(queue, 1)
   local items = req.items
   local opts = req.opts or {}
+  local callback = req.callback
 
   local display = {}
   local header = " " .. (opts.prompt or "Select") .. " "
@@ -57,17 +57,34 @@ local function run_next()
     title_pos = "center",
   })
 
-  active = { buf = buf, win = win }
+  active = { buf = buf, win = win, callback = callback, items = items }
+  
   vim.wo[win].cursorline = true
   vim.wo[win].winhighlight = "Normal:Normal,FloatBorder:Keyword,CursorLine:Visual"
   vim.api.nvim_win_set_cursor(win, { 3, 2 })
 
+  local finished = false
   local function finish(choice)
-    local cb = req.callback
+    if finished then return end
+    finished = true
     close_active()
-    if cb then cb(choice) end
+    if callback then callback(choice) end
     vim.schedule(run_next)
   end
+
+  -- Ensure we cleanup and run next if buffer is closed by other means
+  vim.api.nvim_create_autocmd("BufDelete", {
+    buffer = buf,
+    once = true,
+    callback = function()
+      if not finished then
+        finished = true
+        active = nil
+        if callback then callback(nil) end
+        vim.schedule(run_next)
+      end
+    end,
+  })
 
   local function map(lhs, rhs)
     vim.keymap.set("n", lhs, rhs, { buffer = buf, silent = true, nowait = true })

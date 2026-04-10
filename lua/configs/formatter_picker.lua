@@ -36,6 +36,11 @@ function M.choose_for_filetype(ft, bufnr)
   local candidates = utils.get_mason_candidates(ft, "Formatter")
   vim.list_extend(candidates, utils.get_builtins(ft, "Formatter"))
   
+  if #candidates == 0 then
+    -- Don't notify here as it might be common for some filetypes
+    return
+  end
+
   local recommended = utils.get_recommendation(ft, "Formatter")
   
   local valid = {}
@@ -48,22 +53,27 @@ function M.choose_for_filetype(ft, bufnr)
       local info = conform.get_formatter_info(c)
       local info_alt = not (info and info.command) and conform.get_formatter_info(c:gsub("%-", "_")) or nil
 
-      if (info and info.command) or (info_alt and info_alt.command) then
+      if (info and info.command) or (info_alt and info_alt.command) or vim.list_contains(utils.get_builtins(ft, "Formatter"), c) then
         local tool = (info and info.command) and c or c:gsub("%-", "_")
         
-        local label = tool
-        if tool == recommended then
-          label = tool .. " (Recommended)"
-          table.insert(valid, 1, label)
-        else
-          table.insert(valid, label)
+        if not seen[tool] then
+          seen[tool] = true
+          local label = tool
+          if tool == recommended then
+            label = tool .. " (Recommended)"
+            table.insert(valid, 1, label)
+          else
+            table.insert(valid, label)
+          end
+          display_map[label] = tool
         end
-        display_map[label] = tool
       end
     end
   end
 
-  if #valid == 0 then return end
+  if #valid == 0 then
+    return
+  end
 
   prompting[ft] = true
   local items = { "None" }
@@ -130,7 +140,6 @@ function M.setup()
           set_formatter(ft, saved)
         end)
       else
-        -- Clear and re-prompt
         local current = load_state()
         current.filetypes[ft] = nil
         save_state()
@@ -148,7 +157,6 @@ function M.setup()
     end,
   })
 
-  -- Immediate check for the current buffer
   vim.schedule(function()
     check_buffer(vim.api.nvim_get_current_buf())
   end)
