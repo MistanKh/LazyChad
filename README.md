@@ -11,7 +11,7 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 - **🧠 Intelligent Neural Mappings**: A dynamic toolchain system that live-scans the Mason registry to recommend LSPs, formatters, and linters for every filetype.
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
 - **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts if a tool fails.
-- **💎 Luminous Aesthetics**: Custom "Cyber-Badge" dashboard with real-time intelligence reports and the beautiful Rose Pine theme.
+- **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
 - **🚀 Future-Proof**: Native support for Neovim 0.11+ and the new `vim.lsp.config` API.
 
 ---

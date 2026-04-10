@@ -17,7 +17,7 @@ end
 local function run_next()
   if active or #queue == 0 then return end
   
-  -- Set active immediately to prevent race conditions during nvim_open_win
+  -- Set active immediately to prevent race conditions
   active = { win = nil, buf = nil }
 
   local req = table.remove(queue, 1)
@@ -59,6 +59,7 @@ local function run_next()
 
   active = { buf = buf, win = win }
   vim.wo[win].cursorline = true
+  vim.wo[win].winhighlight = "Normal:Normal,FloatBorder:Keyword,CursorLine:Visual"
   vim.api.nvim_win_set_cursor(win, { 3, 2 })
 
   local function finish(choice)
