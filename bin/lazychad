@@ -25,4 +25,5 @@ if [ ! -d "$LAZYCHAD_DIR" ]; then
 fi
 
 # Run Neovim and pass all arguments ($@)
+export NVIM_APPNAME="LazyChad"
 exec nvim "$@"
