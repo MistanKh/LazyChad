@@ -39,75 +39,77 @@ end
 function M.choose_for_filetype(ft)
   if not ft or ft == "" or prompting[ft] then return end
 
-  local candidates = utils.get_mason_candidates(ft, "Linter")
-  vim.list_extend(candidates, utils.get_builtins(ft, "Linter"))
-  
-  if #candidates == 0 then
-    return
-  end
+  utils.on_registry_ready(function()
+    local candidates = utils.get_mason_candidates(ft, "Linter")
+    vim.list_extend(candidates, utils.get_builtins(ft, "Linter"))
+    
+    if #candidates == 0 then
+      return
+    end
 
-  local recommended = utils.get_recommendation(ft, "Linter")
-  
-  local valid = {}
-  local display_map = {}
-  local seen = {}
-  local ok, lint = pcall(require, "lint")
-  
-  if ok then
-    for _, c in ipairs(candidates) do
-      if not seen[c] then
-        local tool = nil
-        if lint.linters[c] then tool = c
-        elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
-        elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
-        elseif vim.list_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
-        end
-
-        if tool then
-          seen[c] = true
-          local label = tool
-          if tool == recommended then
-            label = tool .. " (Recommended)"
-            table.insert(valid, 1, label)
-          else
-            table.insert(valid, label)
+    local recommended = utils.get_recommendation(ft, "Linter")
+    
+    local valid = {}
+    local display_map = {}
+    local seen = {}
+    local ok, lint = pcall(require, "lint")
+    
+    if ok then
+      for _, c in ipairs(candidates) do
+        if not seen[c] then
+          local tool = nil
+          if lint.linters[c] then tool = c
+          elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
+          elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
+          elseif vim.list_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
           end
-          display_map[label] = tool
+
+          if tool then
+            seen[c] = true
+            local label = tool
+            if tool == recommended then
+              label = tool .. " (Recommended)"
+              table.insert(valid, 1, label)
+            else
+              table.insert(valid, label)
+            end
+            display_map[label] = tool
+          end
         end
       end
     end
-  end
 
-  if #valid == 0 then
-    return
-  end
-
-  prompting[ft] = true
-  local items = { "None" }
-  vim.list_extend(items, valid)
-
-  selection_ui.select(items, {
-    prompt = "Select linter for " .. ft,
-    title = " Linter Picker ",
-  }, function(choice)
-    prompting[ft] = nil
-    if not choice then return end
-
-    local tool = display_map[choice] or choice
-    local current = load_state()
-    current.filetypes[ft] = (tool == "None") and none_choice or tool
-    save_state()
-
-    if tool ~= "None" then
-      local builtins = utils.get_builtins(ft, "Linter")
-      if vim.list_contains(builtins, tool) then
-        set_linter(ft, tool)
-      else
-        utils.ensure_installed(package_name_for(tool), "linter", tool, function()
-          set_linter(ft, tool)
-        end)
-      end
+    if #valid == 0 then
+      return
     end
+
+    prompting[ft] = true
+    local items = { "None" }
+    vim.list_extend(items, valid)
+
+    selection_ui.select(items, {
+      prompt = "Select linter for " .. ft,
+      title = " Linter Picker ",
+    }, function(choice)
+      prompting[ft] = nil
+      if not choice then return end
+
+      local tool = display_map[choice] or choice
+      local current = load_state()
+      current.filetypes[ft] = (tool == "None") and none_choice or tool
+      save_state()
+
+      if tool ~= "None" then
+        local builtins = utils.get_builtins(ft, "Linter")
+        if vim.list_contains(builtins, tool) then
+          set_linter(ft, tool)
+        else
+          utils.ensure_installed(package_name_for(tool), "linter", tool, function()
+            set_linter(ft, tool)
+          end)
+        end
+      end
+    end)
   end)
 end
 

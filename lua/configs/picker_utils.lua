@@ -100,6 +100,20 @@ local ft_mappings = {
   python = "python",
 }
 
+function M.on_registry_ready(callback)
+  local registry_ok, registry = pcall(require, "mason-registry")
+  if not registry_ok then
+    callback()
+    return
+  end
+
+  if #registry.get_all_package_names() > 0 then
+    callback()
+  else
+    registry.refresh(vim.schedule_wrap(callback))
+  end
+end
+
 function M.get_mason_candidates(ft, category)
   local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return {} end

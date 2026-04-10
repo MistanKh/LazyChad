@@ -134,66 +134,70 @@ end
 function M.choose_for_filetype(ft)
   if not ft or ft == "" or prompting[ft] then return end
   
-  local candidates = utils.get_mason_candidates(ft, "LSP")
-  vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
-  
-  if #candidates == 0 then
-    vim.notify("LazyChad: No LSP candidates found for " .. ft, vim.log.levels.WARN)
-    return
-  end
-  
-  local specs = get_server_specs()
-  local recommended = utils.get_recommendation(ft, "LSP")
-  
-  local valid = {}
-  local display_map = {}
-  local seen = {}
-  
-  for _, c in ipairs(candidates) do
-    if not seen[c] and (specs[c] or vim.list_contains(utils.get_builtins(ft, "LSP"), c)) then
-      seen[c] = true
-      local label = c
-      if c == recommended then
-        label = c .. " (Recommended)"
-        table.insert(valid, 1, label)
-      else
-        table.insert(valid, label)
-      end
-      display_map[label] = c
-    end
-  end
-
-  if #valid == 0 then
-    vim.notify("LazyChad: No valid LSP specifications found for " .. ft, vim.log.levels.WARN)
-    return
-  end
-
-  prompting[ft] = true
-  local items = { "None" }
-  vim.list_extend(items, valid)
-
-  selection_ui.select(items, {
-    prompt = "Select LSP for " .. ft,
-    title = " LSP Picker ",
-  }, function(choice)
-    prompting[ft] = nil
-    if not choice then return end
+  utils.on_registry_ready(function()
+    local candidates = utils.get_mason_candidates(ft, "LSP")
+    vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
     
-    local server = display_map[choice] or choice
-    local current = load_state()
-    current.filetypes[ft] = (server == "None") and none_choice or server
-    save_state()
-
-    if server ~= "None" then
-      local builtins = utils.get_builtins(ft, "LSP")
-      if vim.list_contains(builtins, server) then
-        setup_server(server)
-      else
-        utils.ensure_installed(package_name_for(server), "LSP", server, function()
-          setup_server(server)
-        end)
+    if #candidates == 0 then
+      -- If manually triggered, notify. If automatic, maybe be silent?
+      -- For now, let's keep it informative.
+      -- vim.notify("LazyChad: No LSP candidates found for " .. ft, vim.log.levels.WARN)
+      return
+    end
+    
+    local specs = get_server_specs()
+    local recommended = utils.get_recommendation(ft, "LSP")
+    
+    local valid = {}
+    local display_map = {}
+    local seen = {}
+    
+    for _, c in ipairs(candidates) do
+      if not seen[c] and (specs[c] or vim.list_contains(utils.get_builtins(ft, "LSP"), c)) then
+        seen[c] = true
+        local label = c
+        if c == recommended then
+          label = c .. " (Recommended)"
+          table.insert(valid, 1, label)
+        else
+          table.insert(valid, label)
+        end
+        display_map[label] = c
       end
     end
+
+    if #valid == 0 then
+      -- vim.notify("LazyChad: No valid LSP specifications found for " .. ft, vim.log.levels.WARN)
+      return
+    end
+
+    prompting[ft] = true
+    local items = { "None" }
+    vim.list_extend(items, valid)
+
+    selection_ui.select(items, {
+      prompt = "Select LSP for " .. ft,
+      title = " LSP Picker ",
+    }, function(choice)
+      prompting[ft] = nil
+      if not choice then return end
+      
+      local server = display_map[choice] or choice
+      local current = load_state()
+      current.filetypes[ft] = (server == "None") and none_choice or server
+      save_state()
+
+      if server ~= "None" then
+        local builtins = utils.get_builtins(ft, "LSP")
+        if vim.list_contains(builtins, server) then
+          setup_server(server)
+        else
+          utils.ensure_installed(package_name_for(server), "LSP", server, function()
+            setup_server(server)
+          end)
+        end
+      end
+    end)
   end)
 end
 
