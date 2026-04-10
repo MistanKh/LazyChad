@@ -169,9 +169,9 @@ function M.setup()
     end,
   })
 
-  vim.schedule(function()
+  vim.defer_fn(function()
     check_buffer(vim.api.nvim_get_current_buf())
-  end)
+  end, 200)
 
   vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
     group = group,
