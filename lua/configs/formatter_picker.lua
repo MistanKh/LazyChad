@@ -51,26 +51,14 @@ function M.choose_for_filetype(ft, bufnr)
       if (info and info.command) or (info_alt and info_alt.command) then
         local tool = (info and info.command) and c or c:gsub("%-", "_")
         
-        -- Special check: If Mason package requires an external runtime (like dotnet)
-        local can_install = true
-        local reg_ok, reg = pcall(require, "mason-registry")
-        if reg_ok and reg.has_package(c) then
-          local pkg = reg.get_package(c)
-          -- Mason doesn't easily expose 'missing runtime' but we can check the spec
-          -- For now, if it's already installed, it's valid. 
-          -- If not, we trust Mason's ability unless we know it fails.
+        local label = tool
+        if tool == recommended then
+          label = tool .. " (Recommended)"
+          table.insert(valid, 1, label)
+        else
+          table.insert(valid, label)
         end
-
-        if can_install then
-          local label = tool
-          if tool == recommended then
-            label = tool .. " (Recommended)"
-            table.insert(valid, 1, label)
-          else
-            table.insert(valid, label)
-          end
-          display_map[label] = tool
-        end
+        display_map[label] = tool
       end
     end
   end

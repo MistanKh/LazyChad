@@ -2,19 +2,12 @@ local M = {}
 
 local utils = require "configs.picker_utils"
 local selection_ui = require "configs.selection_ui"
-local registry_ok, registry = pcall(require, "mason-registry")
 
 local state_path = vim.fn.stdpath "data" .. "/lsp_picker_state.json"
 local none_choice = "__none__"
 local state = nil
 local prompting = {}
 local server_specs = nil
-
--- NvChad's standard LSP setup
-local nv_lsp = require "nvchad.configs.lspconfig"
-local on_attach = nv_lsp.on_attach
-local on_init = nv_lsp.on_init
-local capabilities = nv_lsp.capabilities
 
 local package_aliases = {
   html = "html-lsp",
@@ -61,6 +54,8 @@ local package_name_cache = {}
 local function package_name_for(server)
   if package_aliases[server] then return package_aliases[server] end
   if package_name_cache[server] then return package_name_cache[server] end
+  
+  local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return server end
   
   -- Fast check
@@ -87,6 +82,12 @@ local function setup_server(server)
   -- Ensure lspconfig is loaded once to populate vim.lsp.config
   local ok_lsp, lspconfig = pcall(require, "lspconfig")
   if not ok_lsp then return end
+  
+  -- NvChad's standard LSP setup (lazily loaded from lspconfig)
+  local nv_lsp = require "nvchad.configs.lspconfig"
+  local on_attach = nv_lsp.on_attach
+  local on_init = nv_lsp.on_init
+  local capabilities = nv_lsp.capabilities
   
   if vim.lsp.config then
     local config = vim.lsp.config[server]
@@ -206,6 +207,7 @@ function M.setup()
       local is_builtin = vim.list_contains(utils.get_builtins(ft, "LSP"), saved)
       local is_installed = is_builtin
       
+      local registry_ok, registry = pcall(require, "mason-registry")
       if not is_installed and registry_ok then
         local pkg_name = package_name_for(saved)
         if registry.has_package(pkg_name) and registry.get_package(pkg_name):is_installed() then

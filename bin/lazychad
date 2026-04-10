@@ -1,0 +1,8 @@
+#!/bin/bash
+# LazyChad - The Intelligent Neovim Wrapper
+
+# Set the AppName so it stays isolated
+export NVIM_APPNAME="LazyChad"
+
+# Run Neovim and pass all arguments ($@)
+exec nvim "$@"

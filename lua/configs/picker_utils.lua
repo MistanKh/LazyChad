@@ -1,6 +1,5 @@
 local M = {}
 
-local registry_ok, registry = pcall(require, "mason-registry")
 local registry_bin_cache = nil
 local failure_blacklist = {}
 
@@ -102,6 +101,7 @@ local ft_mappings = {
 }
 
 function M.get_mason_candidates(ft, category)
+  local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return {} end
   
   local candidates = {}
@@ -148,6 +148,7 @@ function M.get_mason_candidates(ft, category)
 end
 
 function M.package_name_by_bin(bin_name)
+  local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return bin_name end
   
   if registry.has_package(bin_name) then return bin_name end
@@ -176,6 +177,7 @@ function M.clear_blacklist(pkg_name)
 end
 
 function M.ensure_installed(pkg_name, tool_type, display_name, callback)
+  local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then
     callback()
     return
