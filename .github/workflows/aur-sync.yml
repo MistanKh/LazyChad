@@ -38,7 +38,7 @@ jobs:
           # Configure Git
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git config --global --add safe.directory /__w/LazyChad/LazyChad
+          git config --global --add safe.directory '*'
           
           # Clone AUR repo
           GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no" git clone ssh://aur@aur.archlinux.org/lazychad.git aur-repo
@@ -48,10 +48,14 @@ jobs:
           cp lazychad.install aur-repo/
           
           # Update .SRCINFO inside the AUR folder
-          cd aur-repo
+          # makepkg cannot be run as root, so we use a builduser
           useradd -m builduser
-          chown -R builduser:builduser .
+          chown -R builduser:builduser aur-repo
+          cd aur-repo
           su builduser -c "makepkg --printsrcinfo" > .SRCINFO
+          
+          # Fix ownership back to root for git operations
+          chown root:root .SRCINFO PKGBUILD lazychad.install .
           
           # Commit and Push
           git add PKGBUILD .SRCINFO lazychad.install
