@@ -32,13 +32,14 @@ end
 
 function M.choose_for_filetype(ft, bufnr)
   if not ft or ft == "" or prompting[ft] then return end
+  prompting[ft] = true
 
   utils.on_registry_ready(function()
     local candidates = utils.get_mason_candidates(ft, "Formatter")
     vim.list_extend(candidates, utils.get_builtins(ft, "Formatter"))
     
     if #candidates == 0 then
-      -- Don't notify here as it might be common for some filetypes
+      prompting[ft] = nil
       return
     end
 
@@ -73,10 +74,10 @@ function M.choose_for_filetype(ft, bufnr)
     end
 
     if #valid == 0 then
+      prompting[ft] = nil
       return
     end
 
-    prompting[ft] = true
     local items = { "None" }
     vim.list_extend(items, valid)
 
@@ -142,6 +143,7 @@ function M.setup()
           set_formatter(ft, saved)
         end)
       else
+        -- Clear and re-prompt
         local current = load_state()
         current.filetypes[ft] = nil
         save_state()

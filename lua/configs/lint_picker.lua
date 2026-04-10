@@ -38,12 +38,14 @@ end
 
 function M.choose_for_filetype(ft)
   if not ft or ft == "" or prompting[ft] then return end
+  prompting[ft] = true
 
   utils.on_registry_ready(function()
     local candidates = utils.get_mason_candidates(ft, "Linter")
     vim.list_extend(candidates, utils.get_builtins(ft, "Linter"))
     
     if #candidates == 0 then
+      prompting[ft] = nil
       return
     end
 
@@ -80,10 +82,10 @@ function M.choose_for_filetype(ft)
     end
 
     if #valid == 0 then
+      prompting[ft] = nil
       return
     end
 
-    prompting[ft] = true
     local items = { "None" }
     vim.list_extend(items, valid)
 

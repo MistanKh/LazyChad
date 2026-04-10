@@ -133,15 +133,14 @@ end
 
 function M.choose_for_filetype(ft)
   if not ft or ft == "" or prompting[ft] then return end
+  prompting[ft] = true
   
   utils.on_registry_ready(function()
     local candidates = utils.get_mason_candidates(ft, "LSP")
     vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
     
     if #candidates == 0 then
-      -- If manually triggered, notify. If automatic, maybe be silent?
-      -- For now, let's keep it informative.
-      -- vim.notify("LazyChad: No LSP candidates found for " .. ft, vim.log.levels.WARN)
+      prompting[ft] = nil
       return
     end
     
@@ -167,11 +166,10 @@ function M.choose_for_filetype(ft)
     end
 
     if #valid == 0 then
-      -- vim.notify("LazyChad: No valid LSP specifications found for " .. ft, vim.log.levels.WARN)
+      prompting[ft] = nil
       return
     end
 
-    prompting[ft] = true
     local items = { "None" }
     vim.list_extend(items, valid)
 
