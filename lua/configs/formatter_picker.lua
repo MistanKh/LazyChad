@@ -163,7 +163,7 @@ function M.setup()
 
   vim.defer_fn(function()
     check_buffer(vim.api.nvim_get_current_buf())
-  end, 100)
+  end, 200)
 
   vim.api.nvim_create_user_command("FormatPick", function(opts)
     M.choose_for_filetype(opts.args ~= "" and opts.args or vim.bo.filetype, vim.api.nvim_get_current_buf())
