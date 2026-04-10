@@ -8,14 +8,17 @@ on:
 jobs:
   aur-sync:
     runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
     steps:
+      - name: Install dependencies
+        run: |
+          pacman -Syu --noconfirm git base-devel openssh
+
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Publish to AUR
-        uses: KSXPCK/setup-makepkg@v1
 
       - name: Update .SRCINFO and Push to AUR
         run: |
@@ -28,6 +31,7 @@ jobs:
           # Configure Git
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
+          git config --global --add safe.directory /__w/LazyChad/LazyChad
           
           # Clone AUR repo
           GIT_SSH_COMMAND="ssh -i ~/.ssh/id_aur" git clone ssh://aur@aur.archlinux.org/lazychad.git aur-repo
@@ -38,7 +42,10 @@ jobs:
           
           # Update .SRCINFO inside the AUR folder
           cd aur-repo
-          makepkg --printsrcinfo > .SRCINFO
+          # makepkg cannot be run as root
+          useradd -m builduser
+          chown -R builduser:builduser .
+          su builduser -c "makepkg --printsrcinfo" > .SRCINFO
           
           # Commit and Push
           git add PKGBUILD .SRCINFO lazychad.install
