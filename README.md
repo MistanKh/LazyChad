@@ -18,20 +18,30 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 
 ## 📥 Installation
 
-### 1. Backup your existing config
+### 1. Clone LazyChad
+Clone the repository into your config directory under the name `LazyChad` to keep it isolated from your main Neovim configuration.
 ```bash
-mv ~/.config/nvim ~/.config/nvim.bak
-mv ~/.local/share/nvim ~/.local/share/nvim.bak
+git clone https://github.com/MistanKh/LazyChad ~/.config/LazyChad
 ```
 
-### 2. Clone LazyChad
+### 2. Add the wrapper to your PATH
+To run LazyChad conveniently, add its `bin` directory to your shell's PATH.
+
+**For Bash/Zsh:**
 ```bash
-git clone https://github.com/MistanKh/LazyChad ~/.config/nvim
+echo 'export PATH="$HOME/.config/LazyChad/bin:$PATH"' >> ~/.bashrc # or ~/.zshrc
+source ~/.bashrc # or ~/.zshrc
 ```
 
-### 3. Start Neovim
+**For Fish:**
+```fish
+fish_add_path ~/.config/LazyChad/bin
+```
+
+### 3. Start LazyChad
+Now you can launch it using the simple `lazychad` command:
 ```bash
-nvim
+lazychad
 ```
 
 ---
@@ -49,12 +59,10 @@ Once you've launched LazyChad for the first time, follow these steps:
 
 ## 🗑️ Uninstallation
 
-If you ever want to return to your old life, just run:
+To remove LazyChad and clean up its data, run:
 
 ```bash
-rm -rf ~/.config/nvim ~/.local/share/nvim ~/.local/state/nvim ~/.cache/nvim
-mv ~/.config/nvim.bak ~/.config/nvim
-mv ~/.local/share/nvim.bak ~/.local/share/nvim
+rm -rf ~/.config/LazyChad ~/.local/share/LazyChad ~/.local/state/LazyChad ~/.cache/LazyChad
 ```
 
 ---
