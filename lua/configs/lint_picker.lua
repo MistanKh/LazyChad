@@ -114,43 +114,54 @@ end
 
 function M.setup()
   local group = vim.api.nvim_create_augroup("lint_picker", { clear = true })
+
+  local function check_buffer(buf)
+    if not vim.api.nvim_buf_is_valid(buf) then return end
+    local ft = vim.bo[buf].filetype
+    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then return end
+
+    local saved = get_saved_choice(ft)
+    if saved == none_choice then return end
+
+    if saved and saved ~= "" then
+      local is_builtin = vim.list_contains(utils.get_builtins(ft, "Linter"), saved)
+      local is_installed = is_builtin
+      local reg_ok, reg = pcall(require, "mason-registry")
+
+      if not is_installed and reg_ok then
+        local pkg_name = package_name_for(saved)
+        if reg.has_package(pkg_name) and reg.get_package(pkg_name):is_installed() then
+          is_installed = true
+        end
+      end
+
+      if is_installed then
+        vim.schedule(function()
+          set_linter(ft, saved)
+        end)
+      else
+        -- Clear and re-prompt
+        local current = load_state()
+        current.filetypes[ft] = nil
+        save_state()
+        vim.schedule(function() M.choose_for_filetype(ft) end)
+      end
+    else
+      vim.schedule(function() M.choose_for_filetype(ft) end)
+    end
+  end
+
   vim.api.nvim_create_autocmd("FileType", {
     group = group,
     callback = function(args)
-      local ft = vim.bo[args.buf].filetype
-      if not ft or ft == "" or vim.bo[args.buf].buftype ~= "" then return end
-
-      local saved = get_saved_choice(ft)
-      if saved == none_choice then return end
-
-      if saved and saved ~= "" then
-        local is_builtin = vim.list_contains(utils.get_builtins(ft, "Linter"), saved)
-        local is_installed = is_builtin
-        local reg_ok, reg = pcall(require, "mason-registry")
-
-        if not is_installed and reg_ok then
-          local pkg_name = package_name_for(saved)
-          if reg.has_package(pkg_name) and reg.get_package(pkg_name):is_installed() then
-            is_installed = true
-          end
-        end
-
-        if is_installed then
-          vim.schedule(function()
-            set_linter(ft, saved)
-          end)
-        else
-          -- Clear and re-prompt
-          local current = load_state()
-          current.filetypes[ft] = nil
-          save_state()
-          vim.schedule(function() M.choose_for_filetype(ft) end)
-        end
-      else
-        vim.schedule(function() M.choose_for_filetype(ft) end)
-      end
+      check_buffer(args.buf)
     end,
   })
+
+  -- Immediate check for the current buffer
+  vim.schedule(function()
+    check_buffer(vim.api.nvim_get_current_buf())
+  end)
 
   vim.api.nvim_create_autocmd({ "BufWritePost", "InsertLeave" }, {
     group = group,

@@ -129,6 +129,10 @@ function M.choose_for_filetype(ft)
   -- Include builtins (like rust_analyzer)
   vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
   
+  if #candidates == 0 then
+    return
+  end
+  
   local specs = get_server_specs()
   local recommended = utils.get_recommendation(ft, "LSP")
   
