@@ -156,7 +156,7 @@ function M.choose_for_filetype(ft, priority_delay)
       local seen = {}
       
       for _, c in ipairs(candidates) do
-        if not seen[c] and (specs[c] or vim.tbl_contains(utils.get_builtins(ft, "LSP"), c)) then
+        if not seen[c] and (specs[c] or utils.list_contains(utils.get_builtins(ft, "LSP"), c)) then
           seen[c] = true
           local label = c
           if c == recommended then
@@ -191,7 +191,7 @@ function M.choose_for_filetype(ft, priority_delay)
 
         if server ~= "None" then
           local builtins = utils.get_builtins(ft, "LSP")
-          if vim.tbl_contains(builtins, server) then
+          if utils.list_contains(builtins, server) then
             setup_server(server)
           else
             utils.ensure_installed(package_name_for(server), "LSP", server, function()
@@ -230,7 +230,7 @@ function M.setup()
     if saved == none_choice then return end
     
     if saved and saved ~= "" then
-      local is_builtin = vim.tbl_contains(utils.get_builtins(ft, "LSP"), saved)
+      local is_builtin = utils.list_contains(utils.get_builtins(ft, "LSP"), saved)
       local is_installed = is_builtin
       
       local registry_ok, registry = pcall(require, "mason-registry")

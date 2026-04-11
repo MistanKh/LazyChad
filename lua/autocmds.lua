@@ -3,6 +3,8 @@ pcall(require, "nvchad.autocmds")
 local ts_install_group = vim.api.nvim_create_augroup("ts_auto_install", { clear = true })
 local ts_installing = {}
 
+local utils = require "configs.picker_utils"
+
 local function install_ts(buf)
   if not vim.api.nvim_buf_is_valid(buf) then return end
   
@@ -22,7 +24,7 @@ local function install_ts(buf)
     if not parser_config[lang] then return end -- No parser exists for this lang
   end
 
-  if vim.tbl_contains(ts.get_installed("parsers"), lang) then return end
+  if utils.list_contains(ts.get_installed("parsers"), lang) then return end
 
   ts_installing[lang] = true
 

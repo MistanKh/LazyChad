@@ -3,6 +3,9 @@ local M = {}
 local registry_bin_cache = nil
 local failure_blacklist = {}
 
+-- Intelligent version check for list containment
+M.list_contains = vim.list_contains or vim.tbl_contains
+
 function M.read_json(path)
   local fd = vim.uv.fs_open(path, "r", 438)
   if not fd then return nil end
