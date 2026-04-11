@@ -1,6 +1,10 @@
 vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
 vim.g.mapleader = " "
 
+-- Ensure local modules are in the search path
+package.path = package.path .. ";" .. vim.fn.stdpath "config" .. "/lua/?.lua"
+package.path = package.path .. ";" .. vim.fn.stdpath "config" .. "/lua/?/init.lua"
+
 -- bootstrap lazy and all plugins
 local lazypath = vim.fn.stdpath "data" .. "/lazy/lazy.nvim"
 

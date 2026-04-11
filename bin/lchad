@@ -12,10 +12,10 @@ if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
     # Check if installed via system package manager
     if [ -d "$SYSTEM_DIR" ]; then
         mkdir -p "$LAZYCHAD_DIR"
-        echo "📦 Initializing LazyChad configuration..."
-        # Copy everything recursively, don't overwrite
-        cp -rn "$SYSTEM_DIR"/* "$LAZYCHAD_DIR"/
-        # Ensure the user owns the copied files
+        echo "📦 Initializing LazyChad configuration from $SYSTEM_DIR..."
+        # Copy everything recursively from the system directory
+        cp -a "$SYSTEM_DIR"/. "$LAZYCHAD_DIR/"
+        # Ensure the user has full permissions
         chmod -R u+rw "$LAZYCHAD_DIR"
     else
         # Fallback for manual/standalone script usage
