@@ -30,41 +30,44 @@ fi
 echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
 
 # 1. System Packages
-echo -e "\n${BOLD}${YELLOW}[1/4] Checking System Packages...${NC}"
+echo -e "\n${BOLD}${YELLOW}[1/5] Checking System Packages...${NC}"
 
 case $OS in
     arch|cachyos|manjaro)
         PKG_MANAGER="sudo pacman -S --needed --noconfirm"
         DEPS=(
-            "nodejs" "npm" "git" "make" "unzip" "gcc"
+            "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake"
             "ttf-jetbrains-mono-nerd" "neovide"
             "python" "python-pip" "python-pipx" 
             "ripgrep" "fd" "lazygit" 
             "lua51" "luarocks" "lua-jsregexp"
             "wl-clipboard" "xclip"
         )
-        # Check function for pacman
         check_installed() { pacman -Qs "^$1$" >/dev/null 2>&1; }
         ;;
     debian|ubuntu|pop|kali)
         PKG_MANAGER="sudo apt-get install -y"
         sudo apt-get update
         DEPS=(
-            "nodejs" "npm" "git" "make" "unzip" "gcc"
-            "fonts-jetbrains-mono" "python3" "python3-pip" "pipx"
-            "ripgrep" "fd-find" "lua5.1" "luarocks"
-            "wl-clipboard" "xclip"
+            "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "curl" "gnupg" "ca-certificates"
+            "gcc-multilib" "g++-multilib" "libssl-dev" "pkg-config" "libfreetype6-dev"
+            "libasound2-dev" "libexpat1-dev" "libxcb-composite0-dev" "libbz2-dev"
+            "libsndio-dev" "freeglut3-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
+            "libxcursor-dev" "fonts-jetbrains-mono" "python3" "python3-pip" "pipx"
+            "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
         check_installed() { dpkg -l "$1" >/dev/null 2>&1; }
         ;;
     fedora)
         PKG_MANAGER="sudo dnf install -y"
         DEPS=(
-            "nodejs" "npm" "git" "make" "unzip" "gcc"
+            "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "fontconfig-devel"
+            "freetype-devel" "libstdc++-static" "libstdc++-devel"
             "jetbrains-mono-fonts" "python3" "python3-pip" "pipx"
-            "ripgrep" "fd-find" "lua5.1" "luarocks"
-            "wl-clipboard" "xclip"
+            "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
+        # Note: @development-tools is handled separately as it's a group
+        sudo dnf groupinstall -y "Development Tools"
         check_installed() { rpm -q "$1" >/dev/null 2>&1; }
         ;;
     *)
@@ -88,7 +91,7 @@ else
 fi
 
 # 2. Rust Toolchain
-echo -e "\n${BOLD}${YELLOW}[2/4] Checking Rust Toolchain (rustup)...${NC}"
+echo -e "\n${BOLD}${YELLOW}[2/5] Checking Rust Toolchain (rustup)...${NC}"
 if ! exists cargo; then
     echo -e "${BLUE}Installing Rust via rustup...${NC}"
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -98,8 +101,22 @@ else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
 fi
 
-# 3. Global NPM Packages
-echo -e "\n${BOLD}${YELLOW}[3/4] Checking Node.js Providers...${NC}"
+# 3. Neovide (Build from source for Debian/Fedora)
+echo -e "\n${BOLD}${YELLOW}[3/5] Checking Neovide GUI...${NC}"
+if ! exists neovide; then
+    if [[ "$OS" == "arch" || "$OS" == "cachyos" || "$OS" == "manjaro" ]]; then
+        echo -e "${BLUE}Installing Neovide via pacman...${NC}"
+        sudo pacman -S --needed --noconfirm neovide
+    else
+        echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
+        cargo install --git https://github.com/neovide/neovide
+    fi
+else
+    echo -e "${GREEN}✅ Neovide is already installed.${NC}"
+fi
+
+# 4. Global NPM Packages
+echo -e "\n${BOLD}${YELLOW}[4/5] Checking Node.js Providers...${NC}"
 if ! npm list -g neovim >/dev/null 2>&1; then
     echo -e "${BLUE}Installing global npm package: neovim${NC}"
     sudo npm i -g neovim
@@ -114,8 +131,8 @@ else
     echo -e "${GREEN}✅ Global npm 'tree-sitter-cli' is already installed.${NC}"
 fi
 
-# 4. Python Provider (pynvim)
-echo -e "\n${BOLD}${YELLOW}[4/4] Checking Python Providers (pynvim)...${NC}"
+# 5. Python Provider (pynvim)
+echo -e "\n${BOLD}${YELLOW}[5/5] Checking Python Providers (pynvim)...${NC}"
 if ! pipx list | grep -q "pynvim"; then
     echo -e "${BLUE}Installing pynvim via pipx...${NC}"
     pipx install pynvim --force
