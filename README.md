@@ -33,7 +33,19 @@ yay -S lazychad
 paru -S lazychad
 ```
 
-### Option 2: Manual Installation (All Linux/macOS)
+### Option 2: Debian / Ubuntu (.deb)
+Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
+```bash
+sudo apt install ./lazychad_1.0.1_all.deb
+```
+
+### Option 3: Fedora / RHEL (.rpm)
+Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
+```bash
+sudo dnf install ./lazychad-1.0.1-10.noarch.rpm
+```
+
+### Option 4: Manual Installation (All Linux/macOS)
 If you prefer to install manually, follow these steps:
 
 #### 1. Clone LazyChad
