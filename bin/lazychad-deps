@@ -35,6 +35,17 @@ fi
 
 echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
 
+# Check Neovim Version
+check_nvim_version() {
+    NVIM_VER=$(nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+')
+    MAJOR=$(echo "$NVIM_VER" | cut -d. -f1)
+    MINOR=$(echo "$NVIM_VER" | cut -d. -f2)
+    if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 10 ]; then
+        return 1
+    fi
+    return 0
+}
+
 # 1. System Packages
 echo -e "\n${BOLD}${YELLOW}[1/5] Checking System Packages...${NC}"
 
@@ -52,6 +63,11 @@ case $OS in
         check_installed() { pacman -Qs "^$1$" >/dev/null 2>&1; }
         ;;
     debian|ubuntu|pop|kali)
+        if ! check_nvim_version; then
+            echo -e "${BLUE}Detected old Neovim version. Adding official PPA for latest stable...${NC}"
+            sudo add-apt-repository -y ppa:neovim-ppa/unstable
+            sudo apt-get update
+        fi
         PKG_MANAGER="sudo apt-get install -y"
         sudo apt-get update
         DEPS=(
