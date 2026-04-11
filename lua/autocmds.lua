@@ -22,23 +22,19 @@ local function install_ts(buf)
     if not parser_config[lang] then return end -- No parser exists for this lang
   end
 
-  if vim.list_contains(ts.get_installed("parsers"), lang) then return end
+  if vim.tbl_contains(ts.get_installed("parsers"), lang) then return end
 
   ts_installing[lang] = true
 
-  local install_ok, install = pcall(ts.install, lang)
-  if not install_ok then
-    ts_installing[lang] = nil
-    return
-  end
-
-  if install and install.await then
-    install:await(function()
+  vim.schedule(function()
+    -- Use the official Ex command for maximum reliability across versions
+    local ok = pcall(vim.cmd, "TSInstall " .. lang)
+    
+    -- Clear the installing flag after a generous timeout to allow async install to finish
+    vim.defer_fn(function()
       ts_installing[lang] = nil
-    end)
-  else
-    ts_installing[lang] = nil
-  end
+    end, 15000)
+  end)
 end
 
 vim.api.nvim_create_autocmd("FileType", {

@@ -56,7 +56,7 @@ function M.choose_for_filetype(ft, priority_delay)
           local info = conform.get_formatter_info(c)
           local info_alt = not (info and info.command) and conform.get_formatter_info(c:gsub("%-", "_")) or nil
 
-          if (info and info.command) or (info_alt and info_alt.command) or vim.list_contains(utils.get_builtins(ft, "Formatter"), c) then
+          if (info and info.command) or (info_alt and info_alt.command) or vim.tbl_contains(utils.get_builtins(ft, "Formatter"), c) then
             local tool = (info and info.command) and c or c:gsub("%-", "_")
             
             if not seen[tool] then
@@ -96,7 +96,7 @@ function M.choose_for_filetype(ft, priority_delay)
 
         if tool ~= "None" then
           local builtins = utils.get_builtins(ft, "Formatter")
-          if vim.list_contains(builtins, tool) then
+          if vim.tbl_contains(builtins, tool) then
             set_formatter(ft, tool)
             vim.notify("LazyChad: " .. tool .. " set as formatter for " .. ft .. " (Format on Save enabled)", vim.log.levels.INFO)
           else
@@ -142,7 +142,7 @@ function M.setup()
     if saved == none_choice then return end
 
     if saved and saved ~= "" then
-      local is_builtin = vim.list_contains(utils.get_builtins(ft, "Formatter"), saved)
+      local is_builtin = vim.tbl_contains(utils.get_builtins(ft, "Formatter"), saved)
       local is_installed = is_builtin
       local reg_ok, reg = pcall(require, "mason-registry")
 

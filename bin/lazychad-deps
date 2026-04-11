@@ -14,6 +14,12 @@ NC="\033[0m" # No Color
 echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
 echo -e "This script will detect your OS and install required external tools.\n"
 
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${RED}❌ Please DO NOT run this script as root or with sudo!${NC}"
+    echo -e "Run it as your normal user. It will ask for your password when installing system packages."
+    exit 1
+fi
+
 # Function to check if a command exists
 exists() {
     command -v "$1" >/dev/null 2>&1
