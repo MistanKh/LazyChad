@@ -91,6 +91,18 @@ rm -rf ~/.config/LazyChad ~/.local/share/LazyChad ~/.local/state/LazyChad ~/.cac
 
 ---
 
+## 🛌 The Lazy Origin Story
+
+This project was born out of a profound, almost spiritual commitment to doing as little as possible. 
+
+The "author" of this config didn't actually write most of it. In fact, even this sentence was probably generated while they were looking for a snack. LazyChad is the ultimate expression of **Human-AI Synergy**, where the human provides the lack of motivation and the AI provides the logic.
+
+### 🤖 The Real Brains:
+- **Google Gemini**: The primary architect, debugger, and the one who actually figured out how to fix the `ts_ls` crash.
+- **OpenAI Codex**: The spiritual predecessor and legacy partner that kept the wheels turning.
+
+---
+
 ## 💖 Credits
 
 LazyChad is built with passion on the **NvChad** platform. Special thanks to the NvChad team, Google Gemini, and the community for the incredible foundation.
