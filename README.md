@@ -46,9 +46,9 @@ lazychad-deps
 *(This script will check for missing tools and install them via pacman, npm, and pipx).*
 
 ### 4. Start LazyChad
-Now you can launch it using the simple `lazychad` command:
+Now you can launch it using the simple `lchad` command:
 ```bash
-lazychad
+lchad
 ```
 
 ---
