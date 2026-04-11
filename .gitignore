@@ -16,3 +16,17 @@ backup/
 .netrw*
 .DS_Store
 .codex
+
+# Arch / AUR Build Artifacts
+/src/
+/pkg/
+/LazyChad/
+*.tar.zst
+*.tar.gz
+*.tar.xz
+
+# Debian / RPM Artifacts
+*.deb
+*.rpm
+*_all.deb
+.nfpms/
