@@ -23,7 +23,7 @@ exists() {
 echo -e "${BOLD}${YELLOW}[1/4] Checking System Packages (pacman)...${NC}"
 SYSTEM_DEPS=(
     "nodejs" "npm" "git" "make" "unzip" "gcc"
-    "ttf-jetbrains-mono-nerd"
+    "ttf-jetbrains-mono-nerd" "neovide"
     "python" "python-pip" "python-pipx" 
     "ripgrep" "fd" "lazygit" 
     "lua51" "luarocks" "lua-jsregexp"
