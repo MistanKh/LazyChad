@@ -1,0 +1,35 @@
+name: Package Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install nfpm
+
+      - name: Build .deb package
+        run: nfpm package --config nfpm.yaml --packager deb
+
+      - name: Build .rpm package
+        run: nfpm package --config nfpm.yaml --packager rpm
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            *.deb
+            *.rpm
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

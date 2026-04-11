@@ -1,6 +1,6 @@
 #!/bin/bash
-# LazyChad Dependency Installer
-# Automates the setup of external tools required for a smooth Neovim experience.
+# LazyChad Universal Dependency Installer
+# Supports: Arch Linux, Debian/Ubuntu, Fedora
 
 set -e
 
@@ -12,34 +12,77 @@ RED="\033[0;31m"
 NC="\033[0m" # No Color
 
 echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
-echo -e "This script will check and install system dependencies, Rust, Node, and Python providers.\n"
+echo -e "This script will detect your OS and install required external tools.\n"
 
 # Function to check if a command exists
 exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# 1. System Packages (Arch Linux / Pacman)
-echo -e "${BOLD}${YELLOW}[1/4] Checking System Packages (pacman)...${NC}"
-SYSTEM_DEPS=(
-    "nodejs" "npm" "git" "make" "unzip" "gcc"
-    "ttf-jetbrains-mono-nerd" "neovide"
-    "python" "python-pip" "python-pipx" 
-    "ripgrep" "fd" "lazygit" 
-    "lua51" "luarocks" "lua-jsregexp"
-    "wl-clipboard" "xclip"
-)
+# Detect OS
+if [ -f /etc/os-release ]; then
+    . /etc/os-release
+    OS=$ID
+else
+    OS=$(uname -s)
+fi
+
+echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
+
+# 1. System Packages
+echo -e "\n${BOLD}${YELLOW}[1/4] Checking System Packages...${NC}"
+
+case $OS in
+    arch|cachyos|manjaro)
+        PKG_MANAGER="sudo pacman -S --needed --noconfirm"
+        DEPS=(
+            "nodejs" "npm" "git" "make" "unzip" "gcc"
+            "ttf-jetbrains-mono-nerd" "neovide"
+            "python" "python-pip" "python-pipx" 
+            "ripgrep" "fd" "lazygit" 
+            "lua51" "luarocks" "lua-jsregexp"
+            "wl-clipboard" "xclip"
+        )
+        # Check function for pacman
+        check_installed() { pacman -Qs "^$1$" >/dev/null 2>&1; }
+        ;;
+    debian|ubuntu|pop|kali)
+        PKG_MANAGER="sudo apt-get install -y"
+        sudo apt-get update
+        DEPS=(
+            "nodejs" "npm" "git" "make" "unzip" "gcc"
+            "fonts-jetbrains-mono" "python3" "python3-pip" "pipx"
+            "ripgrep" "fd-find" "lua5.1" "luarocks"
+            "wl-clipboard" "xclip"
+        )
+        check_installed() { dpkg -l "$1" >/dev/null 2>&1; }
+        ;;
+    fedora)
+        PKG_MANAGER="sudo dnf install -y"
+        DEPS=(
+            "nodejs" "npm" "git" "make" "unzip" "gcc"
+            "jetbrains-mono-fonts" "python3" "python3-pip" "pipx"
+            "ripgrep" "fd-find" "lua5.1" "luarocks"
+            "wl-clipboard" "xclip"
+        )
+        check_installed() { rpm -q "$1" >/dev/null 2>&1; }
+        ;;
+    *)
+        echo -e "${RED}Unsupported OS: $OS. Please install dependencies manually.${NC}"
+        exit 1
+        ;;
+esac
 
 MISSING_DEPS=()
-for dep in "${SYSTEM_DEPS[@]}"; do
-    if ! pacman -Qs "^$dep$" >/dev/null 2>&1; then
+for dep in "${DEPS[@]}"; do
+    if ! check_installed "$dep"; then
         MISSING_DEPS+=("$dep")
     fi
 done
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
-    echo -e "${BLUE}Installing missing system packages: ${MISSING_DEPS[*]}${NC}"
-    sudo pacman -S --needed --noconfirm "${MISSING_DEPS[@]}"
+    echo -e "${BLUE}Installing missing system packages via $OS package manager...${NC}"
+    $PKG_MANAGER "${MISSING_DEPS[@]}"
 else
     echo -e "${GREEN}✅ All system packages are already installed.${NC}"
 fi
@@ -50,14 +93,13 @@ if ! exists cargo; then
     echo -e "${BLUE}Installing Rust via rustup...${NC}"
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     # shellcheck source=/dev/null
-    source "$HOME/.cargo/env"
+    [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
 else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
 fi
 
 # 3. Global NPM Packages
 echo -e "\n${BOLD}${YELLOW}[3/4] Checking Node.js Providers...${NC}"
-# We check if the 'neovim' package is installed globally
 if ! npm list -g neovim >/dev/null 2>&1; then
     echo -e "${BLUE}Installing global npm package: neovim${NC}"
     sudo npm i -g neovim
@@ -74,7 +116,6 @@ fi
 
 # 4. Python Provider (pynvim)
 echo -e "\n${BOLD}${YELLOW}[4/4] Checking Python Providers (pynvim)...${NC}"
-# Use pipx to install/check pynvim
 if ! pipx list | grep -q "pynvim"; then
     echo -e "${BLUE}Installing pynvim via pipx...${NC}"
     pipx install pynvim --force
