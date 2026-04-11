@@ -106,6 +106,7 @@ local function setup_server(server)
   local on_init = nv_lsp.on_init
   local capabilities = nv_lsp.capabilities
   
+  -- Check if the new Neovim 0.11+ API is available
   if vim.lsp.config then
     local config = vim.lsp.config[server]
     if config then
