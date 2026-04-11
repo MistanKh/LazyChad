@@ -12,6 +12,8 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
 - **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts if a tool fails.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
+- **🖼️ Neovide Optimized**: Pre-configured for the **Neovide** GUI with smooth 120Hz animations, "pixiedust" cursor effects, and perfect typography.
+- **🔡 Typography Ready**: Out-of-the-box support for **JetBrainsMono Nerd Font** for perfect icons and coding clarity.
 - **🚀 Future-Proof**: Native support for Neovim 0.11+ and the new `vim.lsp.config` API.
 
 ---
