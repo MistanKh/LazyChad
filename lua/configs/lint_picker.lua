@@ -64,7 +64,7 @@ function M.choose_for_filetype(ft, priority_delay)
             if lint.linters[c] then tool = c
             elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
             elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
-            elseif vim.tbl_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
+            elseif vim.list_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
             end
 
             if tool then
@@ -104,7 +104,7 @@ function M.choose_for_filetype(ft, priority_delay)
 
         if tool ~= "None" then
           local builtins = utils.get_builtins(ft, "Linter")
-          if vim.tbl_contains(builtins, tool) then
+          if vim.list_contains(builtins, tool) then
             set_linter(ft, tool)
             vim.notify("LazyChad: " .. tool .. " set as linter for " .. ft, vim.log.levels.INFO)
           else
@@ -150,7 +150,7 @@ function M.setup()
     if saved == none_choice then return end
 
     if saved and saved ~= "" then
-      local is_builtin = vim.tbl_contains(utils.get_builtins(ft, "Linter"), saved)
+      local is_builtin = vim.list_contains(utils.get_builtins(ft, "Linter"), saved)
       local is_installed = is_builtin
       local reg_ok, reg = pcall(require, "mason-registry")
 

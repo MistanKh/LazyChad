@@ -5,7 +5,7 @@ name: "lazychad"
 arch: "all"
 platform: "linux"
 version: "1.0.0"
-release: "19"
+release: "20"
 section: "default"
 priority: "extra"
 maintainer: "Mistan Khomdram <mistankhomdram@gmail.com>"
@@ -41,7 +41,7 @@ scripts:
 
 # Dependencies that exist across Arch, Debian, and Fedora
 depends:
-  - neovim
+  - neovim (>= 0.11.0)
   - git
   - ripgrep
   - curl

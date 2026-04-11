@@ -40,7 +40,7 @@ check_nvim_version() {
     NVIM_VER=$(nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+')
     MAJOR=$(echo "$NVIM_VER" | cut -d. -f1)
     MINOR=$(echo "$NVIM_VER" | cut -d. -f2)
-    if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 10 ]; then
+    if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
         return 1
     fi
     return 0

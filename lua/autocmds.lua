@@ -22,7 +22,7 @@ local function install_ts(buf)
     if not parser_config[lang] then return end -- No parser exists for this lang
   end
 
-  if vim.tbl_contains(ts.get_installed("parsers"), lang) then return end
+  if vim.list_contains(ts.get_installed("parsers"), lang) then return end
 
   ts_installing[lang] = true
 
