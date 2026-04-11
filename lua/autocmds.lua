@@ -1,4 +1,4 @@
-require "nvchad.autocmds"
+pcall(require, "nvchad.autocmds")
 
 local ts_install_group = vim.api.nvim_create_augroup("ts_auto_install", { clear = true })
 local ts_installing = {}

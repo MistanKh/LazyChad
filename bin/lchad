@@ -12,8 +12,11 @@ if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
     # Check if installed via system package manager
     if [ -d "$SYSTEM_DIR" ]; then
         mkdir -p "$LAZYCHAD_DIR"
-        # Copy everything, but don't overwrite if files exist (using -n)
-        cp -an "$SYSTEM_DIR/." "$LAZYCHAD_DIR/"
+        echo "📦 Initializing LazyChad configuration..."
+        # Copy everything recursively, don't overwrite
+        cp -rn "$SYSTEM_DIR"/* "$LAZYCHAD_DIR"/
+        # Ensure the user owns the copied files
+        chmod -R u+rw "$LAZYCHAD_DIR"
     else
         # Fallback for manual/standalone script usage
         echo "❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR"

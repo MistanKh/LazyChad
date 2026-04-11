@@ -26,17 +26,23 @@ require("lazy").setup({
 }, lazy_config)
 
 -- load theme
-dofile(vim.g.base46_cache .. "defaults")
-dofile(vim.g.base46_cache .. "statusline")
+pcall(function()
+  if vim.uv.fs_stat(vim.g.base46_cache .. "defaults") then
+    dofile(vim.g.base46_cache .. "defaults")
+    dofile(vim.g.base46_cache .. "statusline")
+  end
+end)
 
-require "options"
-require "autocmds"
+pcall(require, "options")
+pcall(require, "autocmds")
 
 -- Initialize Auto-Pickers
-require("configs.lsp_picker").setup()
-require("configs.formatter_picker").setup()
-require("configs.lint_picker").setup()
+pcall(function()
+  require("configs.lsp_picker").setup()
+  require("configs.formatter_picker").setup()
+  require("configs.lint_picker").setup()
+end)
 
 vim.schedule(function()
-  require "mappings"
+  pcall(require, "mappings")
 end)

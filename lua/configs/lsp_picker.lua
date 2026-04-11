@@ -99,7 +99,9 @@ local function setup_server(server)
   local ok_lsp, lspconfig = pcall(require, "lspconfig")
   if not ok_lsp then return end
   
-  local nv_lsp = require "nvchad.configs.lspconfig"
+  local ok_nv, nv_lsp = pcall(require, "nvchad.configs.lspconfig")
+  if not ok_nv then return end
+  
   local on_attach = nv_lsp.on_attach
   local on_init = nv_lsp.on_init
   local capabilities = nv_lsp.capabilities
