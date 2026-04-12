@@ -68,11 +68,15 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
     else
         # For Debian/Fedora, official repos are too slow. We use the official AppImage.
         cleanup_old_nvim
-        echo -e "${BLUE}Downloading latest Neovim AppImage...${NC}"
-        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
-        chmod +x nvim.appimage
-        sudo mv nvim.appimage /usr/bin/nvim
-        echo -e "${GREEN}✅ Latest Neovim installed to /usr/bin/nvim${NC}"
+        echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64)...${NC}"
+        if curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage; then
+            chmod +x nvim-linux-x86_64.appimage
+            sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
+            echo -e "${GREEN}✅ Latest Neovim installed to /usr/bin/nvim${NC}"
+        else
+            echo -e "${RED}❌ Failed to download Neovim AppImage. Please check your internet connection.${NC}"
+            exit 1
+        fi
     fi
 else
     echo -e "${GREEN}✅ Neovim $CURRENT_VER is already up to date.${NC}"
