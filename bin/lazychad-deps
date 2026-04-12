@@ -35,7 +35,7 @@ fi
 
 echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
 
-# 1. Neovim Version Check & Force Upgrade
+# 1. Neovim Version Check & Upgrade
 echo -e "\n${BOLD}${YELLOW}[1/6] Ensuring Neovim 0.11+ (Latest)...${NC}"
 
 # Function to get neovim version
@@ -44,40 +44,39 @@ get_nvim_ver() {
     nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0"
 }
 
-# Cleanup old versions if necessary
-cleanup_old_nvim() {
-    echo -e "${BLUE}Cleaning up potential conflicting Neovim versions...${NC}"
-    case $OS in
-        arch|cachyos|manjaro) sudo pacman -Rns --noconfirm neovim neovim-nightly 2>/dev/null || true ;;
-        debian|ubuntu|pop|kali) sudo apt-get remove -y neovim neovim-runtime 2>/dev/null || true ;;
-        fedora) sudo dnf remove -y neovim 2>/dev/null || true ;;
-    esac
-    sudo rm -f /usr/local/bin/nvim /usr/bin/nvim.appimage 2>/dev/null || true
-}
-
 CURRENT_VER=$(get_nvim_ver)
 MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
 MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
 
 if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
-    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is too old. Upgrading to latest...${NC}"
+    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is too old. Upgrading to latest stable...${NC}"
     
-    if [[ "$OS" == "arch" || "$OS" == "cachyos" || "$OS" == "manjaro" ]]; then
-        # Arch always has the latest in community or AUR
-        sudo pacman -S --needed --noconfirm neovim
-    else
-        # For Debian/Fedora, official repos are too slow. We use the official AppImage.
-        cleanup_old_nvim
-        echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64)...${NC}"
-        if curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage; then
+    case $OS in
+        arch|cachyos|manjaro)
+            sudo pacman -S --needed --noconfirm neovim
+            ;;
+        debian|ubuntu|pop|kali)
+            echo -e "${BLUE}Adding Neovim Unstable PPA for 0.11+ support...${NC}"
+            sudo apt-get install -y software-properties-common
+            sudo add-apt-repository -y ppa:neovim-ppa/unstable
+            sudo apt-get update
+            sudo apt-get install -y neovim
+            ;;
+        fedora)
+            echo -e "${BLUE}Enabling Neovim COPR for latest stable...${NC}"
+            sudo dnf install -y 'dnf-command(copr)'
+            sudo dnf copr enable -y dluces/neovim-latest
+            sudo dnf install -y neovim
+            ;;
+        *)
+            # Fallback to AppImage only if no repo available
+            echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64)...${NC}"
+            curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
             chmod +x nvim-linux-x86_64.appimage
             sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
-            echo -e "${GREEN}✅ Latest Neovim installed to /usr/bin/nvim${NC}"
-        else
-            echo -e "${RED}❌ Failed to download Neovim AppImage. Please check your internet connection.${NC}"
-            exit 1
-        fi
-    fi
+            ;;
+    esac
+    echo -e "${GREEN}✅ Neovim upgraded successfully.${NC}"
 else
     echo -e "${GREEN}✅ Neovim $CURRENT_VER is already up to date.${NC}"
 fi
