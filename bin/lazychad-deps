@@ -35,19 +35,51 @@ fi
 
 echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
 
-# Check Neovim Version
-check_nvim_version() {
-    NVIM_VER=$(nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+')
-    MAJOR=$(echo "$NVIM_VER" | cut -d. -f1)
-    MINOR=$(echo "$NVIM_VER" | cut -d. -f2)
-    if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
-        return 1
-    fi
-    return 0
+# 1. Neovim Version Check & Force Upgrade
+echo -e "\n${BOLD}${YELLOW}[1/6] Ensuring Neovim 0.11+ (Latest)...${NC}"
+
+# Function to get neovim version
+get_nvim_ver() {
+    if ! exists nvim; then echo "0.0.0"; return; fi
+    nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0"
 }
 
-# 1. System Packages
-echo -e "\n${BOLD}${YELLOW}[1/5] Checking System Packages...${NC}"
+# Cleanup old versions if necessary
+cleanup_old_nvim() {
+    echo -e "${BLUE}Cleaning up potential conflicting Neovim versions...${NC}"
+    case $OS in
+        arch|cachyos|manjaro) sudo pacman -Rns --noconfirm neovim neovim-nightly 2>/dev/null || true ;;
+        debian|ubuntu|pop|kali) sudo apt-get remove -y neovim neovim-runtime 2>/dev/null || true ;;
+        fedora) sudo dnf remove -y neovim 2>/dev/null || true ;;
+    esac
+    sudo rm -f /usr/local/bin/nvim /usr/bin/nvim.appimage 2>/dev/null || true
+}
+
+CURRENT_VER=$(get_nvim_ver)
+MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
+MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
+
+if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
+    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is too old. Upgrading to latest...${NC}"
+    
+    if [[ "$OS" == "arch" || "$OS" == "cachyos" || "$OS" == "manjaro" ]]; then
+        # Arch always has the latest in community or AUR
+        sudo pacman -S --needed --noconfirm neovim
+    else
+        # For Debian/Fedora, official repos are too slow. We use the official AppImage.
+        cleanup_old_nvim
+        echo -e "${BLUE}Downloading latest Neovim AppImage...${NC}"
+        curl -LO https://github.com/neovim/neovim/releases/latest/download/nvim.appimage
+        chmod +x nvim.appimage
+        sudo mv nvim.appimage /usr/bin/nvim
+        echo -e "${GREEN}✅ Latest Neovim installed to /usr/bin/nvim${NC}"
+    fi
+else
+    echo -e "${GREEN}✅ Neovim $CURRENT_VER is already up to date.${NC}"
+fi
+
+# 2. System Packages
+echo -e "\n${BOLD}${YELLOW}[2/6] Checking System Packages...${NC}"
 
 case $OS in
     arch|cachyos|manjaro)
@@ -63,11 +95,6 @@ case $OS in
         check_installed() { pacman -Qs "^$1$" >/dev/null 2>&1; }
         ;;
     debian|ubuntu|pop|kali)
-        if ! check_nvim_version; then
-            echo -e "${BLUE}Detected old Neovim version. Adding official PPA for latest stable...${NC}"
-            sudo add-apt-repository -y ppa:neovim-ppa/unstable
-            sudo apt-get update
-        fi
         PKG_MANAGER="sudo apt-get install -y"
         sudo apt-get update
         DEPS=(
@@ -88,7 +115,6 @@ case $OS in
             "jetbrains-mono-fonts" "python3" "python3-pip" "pipx"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
-        # Install individual build tools instead of a group for better reliability
         sudo dnf install -y gcc gcc-c++ make cmake automake autoconf binutils
         check_installed() { rpm -q "$1" >/dev/null 2>&1; }
         ;;
@@ -112,8 +138,8 @@ else
     echo -e "${GREEN}✅ All system packages are already installed.${NC}"
 fi
 
-# 2. Rust Toolchain
-echo -e "\n${BOLD}${YELLOW}[2/5] Checking Rust Toolchain (rustup)...${NC}"
+# 3. Rust Toolchain
+echo -e "\n${BOLD}${YELLOW}[3/6] Checking Rust Toolchain (rustup)...${NC}"
 if ! exists cargo; then
     echo -e "${BLUE}Installing Rust via rustup...${NC}"
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -123,8 +149,8 @@ else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
 fi
 
-# 3. Neovide (Build from source for Debian/Fedora)
-echo -e "\n${BOLD}${YELLOW}[3/5] Checking Neovide GUI...${NC}"
+# 4. Neovide (Build from source for Debian/Fedora)
+echo -e "\n${BOLD}${YELLOW}[4/6] Checking Neovide GUI...${NC}"
 if ! exists neovide; then
     if [[ "$OS" == "arch" || "$OS" == "cachyos" || "$OS" == "manjaro" ]]; then
         echo -e "${BLUE}Installing Neovide via pacman...${NC}"
@@ -137,8 +163,8 @@ else
     echo -e "${GREEN}✅ Neovide is already installed.${NC}"
 fi
 
-# 4. Global NPM Packages
-echo -e "\n${BOLD}${YELLOW}[4/5] Checking Node.js Providers...${NC}"
+# 5. Global NPM Packages
+echo -e "\n${BOLD}${YELLOW}[5/6] Checking Node.js Providers...${NC}"
 if ! npm list -g neovim >/dev/null 2>&1; then
     echo -e "${BLUE}Installing global npm package: neovim${NC}"
     sudo npm i -g neovim
@@ -153,8 +179,8 @@ else
     echo -e "${GREEN}✅ Global npm 'tree-sitter-cli' is already installed.${NC}"
 fi
 
-# 5. Python Provider (pynvim)
-echo -e "\n${BOLD}${YELLOW}[5/5] Checking Python Providers (pynvim)...${NC}"
+# 6. Python Provider (pynvim)
+echo -e "\n${BOLD}${YELLOW}[6/6] Checking Python Providers (pynvim)...${NC}"
 if ! pipx list | grep -q "pynvim"; then
     echo -e "${BLUE}Installing pynvim via pipx...${NC}"
     pipx install pynvim --force
