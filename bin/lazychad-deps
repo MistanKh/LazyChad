@@ -63,15 +63,13 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
             sudo apt-get install -y neovim
             ;;
         fedora)
-            echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64) for Fedora...${NC}"
-            if curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage; then
-                chmod +x nvim-linux-x86_64.appimage
-                sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
-                echo -e "${GREEN}✅ Latest Neovim installed to /usr/bin/nvim${NC}"
-            else
-                echo -e "${RED}❌ Failed to download Neovim AppImage.${NC}"
-                exit 1
-            fi
+            echo -e "${BLUE}Enabling Neovim Nightly COPR for Fedora...${NC}"
+            # Remove the manual AppImage if it exists to avoid conflicts
+            [ -f /usr/bin/nvim ] && ! rpm -qf /usr/bin/nvim >/dev/null 2>&1 && sudo rm -f /usr/bin/nvim
+            
+            sudo dnf install -y 'dnf-command(copr)'
+            sudo dnf copr enable -y daniele77/neovim
+            sudo dnf install -y neovim
             ;;
         *)
             # Fallback to AppImage only if no repo available
