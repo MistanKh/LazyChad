@@ -48,8 +48,15 @@ CURRENT_VER=$(get_nvim_ver)
 MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
 MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
 
-if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
-    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is too old. Upgrading to latest stable...${NC}"
+# Fedora users want Nightly (0.12+), others are fine with 0.11+
+if [[ "$OS" == "fedora" ]]; then
+    MIN_MINOR=12
+else
+    MIN_MINOR=11
+fi
+
+if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt "$MIN_MINOR" ]; then
+    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is below the target ($MAJOR.$MIN_MINOR). Upgrading...${NC}"
     
     case $OS in
         arch|cachyos|manjaro)
