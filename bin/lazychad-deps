@@ -63,12 +63,17 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt 11 ]; then
             sudo apt-get install -y neovim
             ;;
         fedora)
-            echo -e "${BLUE}Enabling Neovim Nightly COPR for Fedora...${NC}"
-            # Remove the manual AppImage if it exists to avoid conflicts
-            [ -f /usr/bin/nvim ] && ! rpm -qf /usr/bin/nvim >/dev/null 2>&1 && sudo rm -f /usr/bin/nvim
+            echo -e "${BLUE}Ensuring Neovim Nightly on Fedora...${NC}"
+            # Purge all manual AppImage locations to prevent PATH priority issues
+            sudo rm -f /usr/bin/nvim /usr/local/bin/nvim 2>/dev/null || true
             
+            echo -e "${BLUE}Enabling daniele77/neovim COPR...${NC}"
             sudo dnf install -y 'dnf-command(copr)'
             sudo dnf copr enable -y daniele77/neovim
+            sudo dnf clean all
+            echo -e "${BLUE}Synchronizing with COPR repository...${NC}"
+            sudo dnf distro-sync -y neovim
+            # Ensure it is installed if distro-sync didn't trigger it
             sudo dnf install -y neovim
             ;;
         *)
