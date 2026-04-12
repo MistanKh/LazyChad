@@ -7,6 +7,14 @@ local function install_ts(buf)
   if not vim.api.nvim_buf_is_valid(buf) then return end
   
   local ok, ts = pcall(require, "nvim-treesitter")
+  if not ok then
+    -- Force load if lazy-loading hasn't triggered yet
+    local lazy_ok, lazy = pcall(require, "lazy")
+    if lazy_ok then
+      lazy.load({ plugins = { "nvim-treesitter" } })
+      ok, ts = pcall(require, "nvim-treesitter")
+    end
+  end
   if not ok then return end
 
   local ft = vim.bo[buf].filetype
