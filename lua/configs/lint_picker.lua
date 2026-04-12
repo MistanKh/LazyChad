@@ -51,41 +51,50 @@ function M.choose_for_filetype(ft, priority_delay)
       end
 
       local recommended = utils.get_recommendation(ft, "Linter")
+      local builtin_linters = utils.get_builtins(ft, "Linter")
       
-      local valid = {}
       local display_map = {}
       local seen = {}
-      local ok, lint = pcall(require, "lint")
+      local ok_lint, lint = pcall(require, "lint")
       
-      if ok then
-        for _, c in ipairs(candidates) do
-          if not seen[c] then
-            local tool = nil
-            if lint.linters[c] then tool = c
-            elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
-            elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
-            elseif vim.list_contains(utils.get_builtins(ft, "Linter"), c) then tool = c
-            end
-
-            if tool then
-              seen[c] = true
-              local label = tool
-              if tool == recommended then
-                label = tool .. " (Recommended)"
-                table.insert(valid, 1, label)
-              else
-                table.insert(valid, label)
-              end
-              display_map[label] = tool
-            end
+      local valid = {}
+      if ok_lint then
+        valid = vim.iter(candidates):filter(function(c)
+          if seen[c] then return false end
+          
+          local tool = nil
+          if lint.linters[c] then tool = c
+          elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
+          elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
+          elseif vim.list_contains(builtin_linters, c) then tool = c
           end
-        end
+
+          if tool then
+            seen[c] = true
+            return true
+          end
+          return false
+        end):map(function(c)
+          local tool = lint.linters[c] and c or (lint.linters[c:gsub("%-", "")] and c:gsub("%-", "") or c:gsub("%-", "_"))
+          if not lint.linters[tool] then tool = c end
+          
+          local label = tool == recommended and (tool .. " (Recommended)") or tool
+          display_map[label] = tool
+          return label
+        end):totable()
       end
 
       if #valid == 0 then
         prompting[ft] = nil
         return
       end
+
+      -- Sort valid items, recommended first
+      table.sort(valid, function(a, b)
+        if a:find("(Recommended)") then return true end
+        if b:find("(Recommended)") then return false end
+        return a < b
+      end)
 
       local items = { "None" }
       vim.list_extend(items, valid)
@@ -103,8 +112,7 @@ function M.choose_for_filetype(ft, priority_delay)
         save_state()
 
         if tool ~= "None" then
-          local builtins = utils.get_builtins(ft, "Linter")
-          if vim.list_contains(builtins, tool) then
+          if vim.list_contains(builtin_linters, tool) then
             set_linter(ft, tool)
             vim.notify("LazyChad: " .. tool .. " set as linter for " .. ft, vim.log.levels.INFO)
           else
@@ -114,11 +122,10 @@ function M.choose_for_filetype(ft, priority_delay)
             end)
           end
         else
-          local ok, lint = pcall(require, "lint")
-          if ok then lint.linters_by_ft[ft] = nil end
+          local ok, l = pcall(require, "lint")
+          if ok then l.linters_by_ft[ft] = nil end
           vim.notify("LazyChad: Linter disabled for " .. ft, vim.log.levels.INFO)
         end
-
       end)
     end
 

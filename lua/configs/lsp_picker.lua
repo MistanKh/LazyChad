@@ -150,24 +150,30 @@ function M.choose_for_filetype(ft, priority_delay)
       
       local specs = get_server_specs()
       local recommended = utils.get_recommendation(ft, "LSP")
+      local builtin_lsps = utils.get_builtins(ft, "LSP")
       
-      local valid = {}
       local display_map = {}
       local seen = {}
       
-      for _, c in ipairs(candidates) do
-        if not seen[c] and (specs[c] or vim.list_contains(utils.get_builtins(ft, "LSP"), c)) then
+      local valid = vim.iter(candidates):filter(function(c)
+        if seen[c] then return false end
+        if specs[c] or vim.list_contains(builtin_lsps, c) then
           seen[c] = true
-          local label = c
-          if c == recommended then
-            label = c .. " (Recommended)"
-            table.insert(valid, 1, label)
-          else
-            table.insert(valid, label)
-          end
-          display_map[label] = c
+          return true
         end
-      end
+        return false
+      end):map(function(c)
+        local label = c == recommended and (c .. " (Recommended)") or c
+        display_map[label] = c
+        return label
+      end):totable()
+
+      -- Ensure recommended is at the top
+      table.sort(valid, function(a, b)
+        if a:find("(Recommended)") then return true end
+        if b:find("(Recommended)") then return false end
+        return a < b
+      end)
 
       if #valid == 0 then
         prompting[ft] = nil
@@ -190,8 +196,7 @@ function M.choose_for_filetype(ft, priority_delay)
         save_state()
 
         if server ~= "None" then
-          local builtins = utils.get_builtins(ft, "LSP")
-          if vim.list_contains(builtins, server) then
+          if vim.list_contains(builtin_lsps, server) then
             setup_server(server)
           else
             utils.ensure_installed(package_name_for(server), "LSP", server, function()

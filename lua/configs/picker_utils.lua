@@ -118,47 +118,30 @@ function M.get_mason_candidates(ft, category)
   local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then return {} end
   
-  local candidates = {}
   local packages = registry.get_all_packages()
-  
   local ft_base = ft:match("^([^%.]+)") or ft
   local mapped_ft = ft_mappings[ft_base] or ft_base
   
-  for _, pkg in ipairs(packages) do
+  return vim.iter(packages):filter(function(pkg)
     local spec = pkg.spec
-    local is_match = false
+    if not spec.categories or not spec.languages then return false end
     
-    local has_category = false
-    if spec.categories then
-      for _, cat in ipairs(spec.categories) do
-        if cat:lower() == category:lower() then
-          has_category = true
-          break
-        end
-      end
-    end
+    local has_category = vim.iter(spec.categories):any(function(cat)
+      return cat:lower() == category:lower()
+    end)
     
-    if has_category and spec.languages then
-      for _, lang in ipairs(spec.languages) do
-        local l = lang:lower():gsub(" ", "")
-        if l == ft_base:lower() or l == ft:lower() or l == mapped_ft:lower() then
-          is_match = true
-          break
-        end
-      end
-    end
+    if not has_category then return false end
     
-    if is_match then
-      if category == "LSP" and spec.neovim and spec.neovim.lspconfig then
-        table.insert(candidates, spec.neovim.lspconfig)
-      else
-        table.insert(candidates, pkg.name)
-      end
+    return vim.iter(spec.languages):any(function(lang)
+      local l = lang:lower():gsub(" ", "")
+      return l == ft_base:lower() or l == ft:lower() or l == mapped_ft:lower()
+    end)
+  end):map(function(pkg)
+    if category == "LSP" and pkg.spec.neovim and pkg.spec.neovim.lspconfig then
+      return pkg.spec.neovim.lspconfig
     end
-  end
-  
-  table.sort(candidates)
-  return candidates
+    return pkg.name
+  end):totable()
 end
 
 function M.package_name_by_bin(bin_name)
