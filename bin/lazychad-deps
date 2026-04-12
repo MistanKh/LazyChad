@@ -63,11 +63,29 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt "$MIN_MINOR" ]; then
             sudo pacman -S --needed --noconfirm neovim
             ;;
         debian|ubuntu|pop|kali)
-            echo -e "${BLUE}Adding Neovim Unstable PPA for 0.11+ support...${NC}"
-            sudo apt-get install -y software-properties-common
-            sudo add-apt-repository -y ppa:neovim-ppa/unstable
+            echo -e "${BLUE}Updating system package lists...${NC}"
             sudo apt-get update
-            sudo apt-get install -y neovim
+            echo -e "${BLUE}Ensuring software-properties-common and gnupg...${NC}"
+            sudo apt-get install -y software-properties-common gnupg ca-certificates
+            
+            echo -e "${BLUE}Adding Neovim Unstable PPA for 0.11+ support...${NC}"
+            # Use a timeout to prevent hanging on keyserver issues
+            if ! sudo timeout 120s add-apt-repository -y ppa:neovim-ppa/unstable; then
+                echo -e "${RED}⚠️ PPA addition timed out or failed.${NC}"
+                echo -e "${YELLOW}Falling back to AppImage installation...${NC}"
+                NEED_APPIMAGE=true
+            else
+                sudo apt-get update
+                sudo apt-get install -y neovim
+                NEED_APPIMAGE=false
+            fi
+
+            if [ "$NEED_APPIMAGE" = true ]; then
+                echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64)...${NC}"
+                curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
+                chmod +x nvim-linux-x86_64.appimage
+                sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
+            fi
             ;;
         fedora)
             echo -e "${BLUE}Ensuring Neovim Nightly on Fedora...${NC}"
