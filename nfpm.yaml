@@ -5,7 +5,7 @@ name: "lazychad"
 arch: "all"
 platform: "linux"
 version: "1.0.0"
-release: "21"
+release: "22"
 section: "default"
 priority: "extra"
 maintainer: "Mistan Khomdram <mistankhomdram@gmail.com>"
@@ -38,6 +38,7 @@ scripts:
   # but native packages usually don't touch home dirs.
   # We'll stick to a simple post-install notification for now.
   postinstall: ./scripts/linux-postinstall.sh
+  postremove: ./scripts/linux-postremove.sh
 
 # Dependencies that exist across Arch, Debian, and Fedora
 depends:
