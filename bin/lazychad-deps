@@ -74,14 +74,22 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt "$MIN_MINOR" ]; then
             # Purge all manual AppImage locations to prevent PATH priority issues
             sudo rm -f /usr/bin/nvim /usr/local/bin/nvim 2>/dev/null || true
             
-            echo -e "${BLUE}Enabling daniele77/neovim COPR...${NC}"
+            echo -e "${BLUE}Updating COPR repositories...${NC}"
             sudo dnf install -y 'dnf-command(copr)'
-            sudo dnf copr enable -y daniele77/neovim
+            
+            # Disable the broken/outdated COPR if it exists
+            if sudo dnf copr list | grep -q "daniele77/neovim"; then
+                echo -e "${YELLOW}Disabling broken daniele77/neovim COPR...${NC}"
+                sudo dnf copr disable -y daniele77/neovim
+            fi
+            
+            echo -e "${BLUE}Enabling agriffis/neovim-nightly COPR...${NC}"
+            sudo dnf copr enable -y agriffis/neovim-nightly
             sudo dnf clean all
             echo -e "${BLUE}Synchronizing with COPR repository...${NC}"
             sudo dnf distro-sync -y neovim
             # Ensure it is installed if distro-sync didn't trigger it
-            sudo dnf install -y neovim
+            sudo dnf install -y neovim python3-neovim
             ;;
         *)
             # Fallback to AppImage only if no repo available
