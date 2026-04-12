@@ -90,6 +90,19 @@ local function run_next()
     vim.keymap.set("n", lhs, rhs, { buffer = buf, silent = true, nowait = true })
   end
 
+  -- Fix E21 by mapping any potential modifiable operations to no-op
+  map("i", "<Nop>")
+  map("a", "<Nop>")
+  map("r", "<Nop>")
+  map("v", "<Nop>")
+  map("x", "<Nop>")
+  map("s", "<Nop>")
+  map("o", "<Nop>")
+  map("p", "<Nop>")
+  map("d", "<Nop>")
+  map("c", "<Nop>")
+  map("u", "<Nop>")
+
   map("j", function()
     local curr = vim.api.nvim_win_get_cursor(win)[1]
     if curr < height then vim.api.nvim_win_set_cursor(win, { curr + 1, 2 }) end
