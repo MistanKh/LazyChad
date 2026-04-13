@@ -11,8 +11,28 @@ end)
 -- This happens when the terminal responds to a query before Neovim is ready
 vim.o.ttyfast = true
 vim.o.lazyredraw = true
-vim.opt.ttimeoutlen = 10 -- Shorter timeout to distinguish terminal codes from typed keys
-vim.opt.timeoutlen = 500  -- Faster leader/mapping timeouts
+vim.opt.ttimeoutlen = 10
+vim.opt.timeoutlen = 500
+vim.o.termguicolors = true
+
+-- The "Nuclear Option": Stop Neovim from querying terminal capabilities entirely
+-- This prevents the terminal from ever sending the +q4D73 response.
+vim.cmd([[
+  let &t_u7 = ""
+  let &t_TI = ""
+  let &t_TE = ""
+]])
+
+-- Final safety: Clear any leaked characters if they still managed to get in during the first 50ms
+vim.api.nvim_create_autocmd("VimEnter", {
+  callback = function()
+    if vim.fn.mode() == "n" then
+      vim.schedule(function()
+        vim.cmd("silent! normal! \x1b") -- Send an ESC to flush any partial escape sequences
+      end)
+    end
+  end,
+})
 
 -- add yours here!
 
