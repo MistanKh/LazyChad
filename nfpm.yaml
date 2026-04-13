@@ -4,7 +4,7 @@
 name: "lazychad"
 arch: "all"
 platform: "linux"
-version: "1.4.3"
+version: "1.4.4"
 release: "1"
 section: "default"
 priority: "extra"

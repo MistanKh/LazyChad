@@ -69,19 +69,14 @@ if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt "$MIN_MINOR" ]; then
     UPGRADE_NEEDED=true
 fi
 
-# If it's a dev version on Kali/AppImage, we might want to refresh it
+# If it's a dev version on Kali/AppImage, we might want to refresh it or move to Stable
 if [[ "$OS" == "kali" ]] || [ ! -f /usr/bin/nvim ] || [[ $(file /usr/bin/nvim 2>/dev/null) == *"AppImage"* ]]; then
     if is_nightly; then
-        echo -e "${YELLOW}Neovim Nightly (AppImage) detected.${NC}"
-        # Check if stdin is a terminal before asking
-        if [ -t 0 ]; then
-            read -p "Do you want to refresh/update to the latest Nightly build? (y/N) " -n 1 -r
-            echo
-            if [[ $REPLY =~ ^[Yy]$ ]]; then
-                UPGRADE_NEEDED=true
-            fi
-        else
-            echo -e "${BLUE}Non-interactive environment detected. Skipping Nightly refresh.${NC}"
+        echo -e "${YELLOW}Neovim development version detected.${NC}"
+        read -p "Do you want to switch to (or refresh) the latest Stable build? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            UPGRADE_NEEDED=true
         fi
     fi
 fi
@@ -117,9 +112,10 @@ if [ "$UPGRADE_NEEDED" = true ]; then
             fi
 
             if [ "$NEED_APPIMAGE" = true ]; then
-                echo -e "${BLUE}Downloading latest Neovim Nightly AppImage (x86_64)...${NC}"
+                echo -e "${BLUE}Downloading latest Neovim Stable AppImage (x86_64)...${NC}"
                 TEMP_APPIMAGE=$(mktemp)
-                curl -fLo "$TEMP_APPIMAGE" https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.appimage
+                # Use 'latest/download' for Stable releases (v0.12+) instead of 'nightly'
+                curl -fLo "$TEMP_APPIMAGE" https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
                 chmod +x "$TEMP_APPIMAGE"
                 
                 # Explicitly remove old version to ensure clean slate
