@@ -38,14 +38,14 @@ paru -S lazychad
 ### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.3.8_all.deb
+sudo apt install ./lazychad_1.0.0_all.deb
 ```
 *Note: Kali Linux users will automatically get the AppImage version during `lazychad-deps` to ensure system stability.*
 
 ### Option 3: Fedora / RHEL (.rpm)
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo dnf install ./lazychad-1.3.8-1.noarch.rpm
+sudo dnf install ./lazychad-1.0.0-1.noarch.rpm
 ```
 *Note: Fedora users get the latest Neovim Nightly via the `agriffis` COPR repository.*
 
