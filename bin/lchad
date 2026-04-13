@@ -7,22 +7,42 @@ export NVIM_APPNAME="LazyChad"
 LAZYCHAD_DIR="$HOME/.config/LazyChad"
 SYSTEM_DIR="/usr/share/lazychad"
 
-# First-time setup: Seed the user's config directory
+# First-time setup or version mismatch check
 if [ ! -d "$LAZYCHAD_DIR" ] || [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
-    # Check if installed via system package manager
     if [ -d "$SYSTEM_DIR" ]; then
         mkdir -p "$LAZYCHAD_DIR"
         echo "📦 Initializing LazyChad configuration from $SYSTEM_DIR..."
-        # Copy everything recursively from the system directory
         cp -a "$SYSTEM_DIR"/. "$LAZYCHAD_DIR/"
-        # Ensure the user has full permissions
         chmod -R u+rw "$LAZYCHAD_DIR"
     else
-        # Fallback for manual/standalone script usage
         echo "❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR"
         echo "If you installed manually, please clone the repository there:"
         echo "git clone https://github.com/MistanKh/LazyChad $LAZYCHAD_DIR"
         exit 1
+    fi
+else
+    # Check for version mismatch between system and user config
+    if [ -f "$SYSTEM_DIR/.version" ]; then
+        SYS_VER=$(cat "$SYSTEM_DIR/.version")
+        USER_VER=$(cat "$LAZYCHAD_DIR/.version" 2>/dev/null || echo "0.0.0")
+        
+        if [ "$SYS_VER" != "$USER_VER" ]; then
+            echo -e "\033[0;33m🔔 System update detected (v$USER_VER -> v$SYS_VER)!\033[0m"
+            echo "Your local configuration is out of date."
+            read -p "Do you want to refresh your local configuration? (y/N) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                BACKUP_DIR="${LAZYCHAD_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
+                echo "🗄️ Backing up current config to $BACKUP_DIR..."
+                mv "$LAZYCHAD_DIR" "$BACKUP_DIR"
+                
+                echo "📦 Syncing new version v$SYS_VER..."
+                mkdir -p "$LAZYCHAD_DIR"
+                cp -a "$SYSTEM_DIR"/. "$LAZYCHAD_DIR/"
+                chmod -R u+rw "$LAZYCHAD_DIR"
+                echo "✅ Sync complete. You can find your old files in $BACKUP_DIR"
+            fi
+        fi
     fi
 fi
 
