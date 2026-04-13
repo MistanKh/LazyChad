@@ -1,6 +1,9 @@
 vim.g.base46_cache = vim.fn.stdpath "data" .. "/base46/"
 vim.g.mapleader = " "
 
+-- Force termguicolors early to stop terminal query leaks
+vim.opt.termguicolors = true
+
 -- Ensure local modules are in the search path by prepending the config directory to rtp
 vim.opt.rtp:prepend(vim.fn.stdpath "config")
 

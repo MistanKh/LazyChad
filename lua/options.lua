@@ -26,11 +26,10 @@ vim.cmd([[
 -- Final safety: Clear any leaked characters if they still managed to get in during the first 50ms
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
-    if vim.fn.mode() == "n" then
-      vim.schedule(function()
-        vim.cmd("silent! normal! \x1b") -- Send an ESC to flush any partial escape sequences
-      end)
-    end
+    vim.schedule(function()
+      -- Force normal mode and send an ESC to flush any partial escape sequences
+      vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes("<C-\\><C-n><Esc>", true, false, true), "n", false)
+    end)
   end,
 })
 
