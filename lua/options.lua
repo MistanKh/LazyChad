@@ -1,5 +1,12 @@
 require "nvchad.options"
 
+-- Silence all Neovim deprecation warnings (especially for stylize_markdown in 0.11+)
+vim.g.deprecation_warnings = false
+-- Suppress specific internal deprecation notices
+pcall(function()
+  vim.deprecate = function() end
+end)
+
 -- add yours here!
 
 -- local o = vim.o
