@@ -22,6 +22,14 @@ M.nvdash = {
 
     local status = count > 0 and "OPTIMIZED" or "INITIALIZING"
     
+    local version = "?.?.?"
+    local ver_path = vim.fn.stdpath "config" .. "/.version"
+    local f = io.open(ver_path, "r")
+    if f then
+      version = f:read("*all"):gsub("%s+", "")
+      f:close()
+    end
+    
     return {
       "",
       "╔════════════════════════════════════════════════════════════════╗",
@@ -36,7 +44,7 @@ M.nvdash = {
       "╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝",
       "",
       "──────────────────────────────────────────────────────────────────",
-      "     INTELLIGENCE: " .. string.format("%-14s", status) .. "|    NEURAL MAPPINGS: " .. string.format("%-2d", count) .. "         ",
+      " INTELLIGENCE: " .. string.format("%-11s", status) .. "|  VERSION: " .. string.format("%-7s", version) .. "|  MAPPINGS: " .. string.format("%-2d", count) .. " ",
       "──────────────────────────────────────────────────────────────────",
       "",
     }
