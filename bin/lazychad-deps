@@ -44,6 +44,11 @@ get_nvim_ver() {
     nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0"
 }
 
+is_nightly() {
+    if ! exists nvim; then return 1; fi
+    nvim --version | head -n 1 | grep -q "dev"
+}
+
 CURRENT_VER=$(get_nvim_ver)
 MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
 MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
@@ -55,8 +60,25 @@ else
     MIN_MINOR=11
 fi
 
+UPGRADE_NEEDED=false
 if [ "$MAJOR" -eq 0 ] && [ "$MINOR" -lt "$MIN_MINOR" ]; then
-    echo -e "${BLUE}Current Neovim ($CURRENT_VER) is below the target ($MAJOR.$MIN_MINOR). Upgrading...${NC}"
+    UPGRADE_NEEDED=true
+fi
+
+# If it's a dev version on Kali/AppImage, we might want to refresh it
+if [[ "$OS" == "kali" ]] || [ ! -f /usr/bin/nvim ] || [[ $(file /usr/bin/nvim 2>/dev/null) == *"AppImage"* ]]; then
+    if is_nightly; then
+        echo -e "${YELLOW}Neovim Nightly (AppImage) detected.${NC}"
+        read -p "Do you want to refresh/update to the latest Nightly build? (y/N) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            UPGRADE_NEEDED=true
+        fi
+    fi
+fi
+
+if [ "$UPGRADE_NEEDED" = true ]; then
+    echo -e "${BLUE}Updating Neovim...${NC}"
     
     case $OS in
         arch|cachyos|manjaro)
