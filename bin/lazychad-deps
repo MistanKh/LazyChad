@@ -90,8 +90,25 @@ if [ "$UPGRADE_NEEDED" = true ]; then
             ;;
         debian|ubuntu|pop|kali)
             if [[ "$OS" == "kali" ]]; then
-                echo -e "${YELLOW}Detected Kali Linux. Skipping PPA to prevent system instability.${NC}"
-                NEED_APPIMAGE=true
+                echo -e "${BLUE}Detected Kali Linux. Setting up Debian Experimental for Native Neovim...${NC}"
+                
+                # 1. Add Experimental Repo
+                echo "deb http://deb.debian.org/debian experimental main" | sudo tee /etc/apt/sources.list.d/experimental.list
+                
+                # 2. Setup Apt-Pinning (Safety first: don't upgrade the whole system to experimental!)
+                sudo mkdir -p /etc/apt/preferences.d
+                echo -e "Package: *\nPin: release a=experimental\nPin-Priority: 1" | sudo tee /etc/apt/preferences.d/experimental
+                echo -e "\nPackage: neovim*\nPin: release a=experimental\nPin-Priority: 500" | sudo tee /etc/apt/preferences.d/experimental
+                
+                echo -e "${BLUE}Updating system package lists...${NC}"
+                sudo apt-get update
+                echo -e "${BLUE}Installing Neovim from Debian Experimental...${NC}"
+                if ! sudo apt-get install -t experimental -y neovim; then
+                    echo -e "${RED}⚠️ Native install failed. Falling back to AppImage...${NC}"
+                    NEED_APPIMAGE=true
+                else
+                    NEED_APPIMAGE=false
+                fi
             else
                 echo -e "${BLUE}Updating system package lists...${NC}"
                 sudo apt-get update
