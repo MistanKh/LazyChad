@@ -7,6 +7,13 @@ pcall(function()
   vim.deprecate = function() end
 end)
 
+-- Fix terminal query leaks (like +q4D73) on some terminal emulators
+-- This happens when the terminal responds to a query before Neovim is ready
+vim.o.ttyfast = true
+vim.o.lazyredraw = true
+vim.opt.ttimeoutlen = 10 -- Shorter timeout to distinguish terminal codes from typed keys
+vim.opt.timeoutlen = 500  -- Faster leader/mapping timeouts
+
 -- add yours here!
 
 -- local o = vim.o
