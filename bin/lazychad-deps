@@ -57,8 +57,8 @@ CURRENT_VER=$(get_nvim_ver)
 MAJOR=$(echo "$CURRENT_VER" | cut -d. -f1)
 MINOR=$(echo "$CURRENT_VER" | cut -d. -f2)
 
-# Fedora users want Nightly (0.12+), others are fine with 0.11+
-if [[ "$OS" == "fedora" ]]; then
+# Fedora and Kali users want Nightly (0.12+), others are fine with 0.11+
+if [[ "$OS" == "fedora" ]] || [[ "$OS" == "kali" ]]; then
     MIN_MINOR=12
 else
     MIN_MINOR=11
