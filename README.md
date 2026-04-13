@@ -10,7 +10,9 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 
 - **🧠 Intelligent Neural Mappings**: A dynamic toolchain system that live-scans the Mason registry to recommend LSPs, formatters, and linters for every filetype.
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
-- **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts if a tool fails.
+- **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts and a 120s safety timeout for repository additions.
+- **🛡️ Cross-Distro Intelligence**: Automatically detects **Kali Linux** and other "Frankendebian" environments to safely install Neovim via AppImage instead of potentially breaking PPAs.
+- **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
 - **🖼️ Neovide Optimized**: Pre-configured for the **Neovide** GUI with smooth 120Hz animations, "pixiedust" cursor effects, and perfect typography.
 - **🔡 Typography Ready**: Out-of-the-box support for **JetBrainsMono Nerd Font** for perfect icons and coding clarity.
@@ -21,7 +23,7 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 ## 📥 Installation
 
 ### Option 1: Arch Linux (AUR)
-If you are on Arch Linux, you can install LazyChad directly from the AUR. This is the recommended method as it handles all dependencies and provides a system-wide `lchad` command.
+If you are on Arch Linux or CachyOS, you can install LazyChad directly from the AUR. 
 
 **Using yay:**
 ```bash
@@ -33,17 +35,19 @@ yay -S lazychad
 paru -S lazychad
 ```
 
-### Option 2: Debian / Ubuntu (.deb)
+### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.0.1_all.deb
+sudo apt install ./lazychad_1.3.8_all.deb
 ```
+*Note: Kali Linux users will automatically get the AppImage version during `lazychad-deps` to ensure system stability.*
 
 ### Option 3: Fedora / RHEL (.rpm)
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo dnf install ./lazychad-1.0.1-10.noarch.rpm
+sudo dnf install ./lazychad-1.3.8-1.noarch.rpm
 ```
+*Note: Fedora users get the latest Neovim Nightly via the `agriffis` COPR repository.*
 
 ### Option 4: Manual Installation (All Linux/macOS)
 If you prefer to install manually, follow these steps:
@@ -73,6 +77,29 @@ Run the built-in dependency script to set up Node, Python, and Rust providers:
 ```bash
 lazychad-deps
 ```
+
+---
+
+## 🔄 Updating LazyChad
+
+### Step 1: Update the Package
+*   **Arch Linux**: `paru -Syu` or `yay -Syu`
+*   **Fedora**: `sudo dnf update lazychad`
+*   **Debian/Ubuntu/Kali**: Download and install the new `.deb`.
+*   **Manual**: `cd ~/.config/LazyChad && git pull`
+
+### Step 2: Synchronize Configuration
+Run `lchad`. If a system-wide update is detected, LazyChad will automatically prompt:
+`🔔 System update detected (v1.3.7 -> v1.3.8)!`
+
+Press `y` to sync. Your old configuration will be safely backed up to a timestamped folder in `~/.config/`.
+
+### Step 3: Refresh Toolchain
+Run the dependency script to ensure your Neovim, Node, and Python providers are up to date:
+```bash
+lazychad-deps
+```
+*On Kali Linux or AppImage installations, the script will ask if you want to refresh the latest Nightly build.*
 
 ---
 
