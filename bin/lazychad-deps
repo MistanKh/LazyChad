@@ -28,10 +28,13 @@ exists() {
 # Detect OS
 if [ -f /etc/os-release ]; then
     . /etc/os-release
-    OS=$ID
+    OS="$ID"
 else
-    OS=$(uname -s)
+    OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 fi
+
+# Set a fallback for NAME if it's missing from os-release
+NAME="${NAME:-$OS}"
 
 echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
 
@@ -41,6 +44,7 @@ echo -e "\n${BOLD}${YELLOW}[1/6] Ensuring Neovim 0.11+ (Latest)...${NC}"
 # Function to get neovim version
 get_nvim_ver() {
     if ! exists nvim; then echo "0.0.0"; return; fi
+    # Use a more robust version extraction
     nvim --version | head -n 1 | grep -oP 'v\K[0-9.]+' || echo "0.0.0"
 }
 
@@ -69,10 +73,15 @@ fi
 if [[ "$OS" == "kali" ]] || [ ! -f /usr/bin/nvim ] || [[ $(file /usr/bin/nvim 2>/dev/null) == *"AppImage"* ]]; then
     if is_nightly; then
         echo -e "${YELLOW}Neovim Nightly (AppImage) detected.${NC}"
-        read -p "Do you want to refresh/update to the latest Nightly build? (y/N) " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            UPGRADE_NEEDED=true
+        # Check if stdin is a terminal before asking
+        if [ -t 0 ]; then
+            read -p "Do you want to refresh/update to the latest Nightly build? (y/N) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                UPGRADE_NEEDED=true
+            fi
+        else
+            echo -e "${BLUE}Non-interactive environment detected. Skipping Nightly refresh.${NC}"
         fi
     fi
 fi
@@ -80,7 +89,7 @@ fi
 if [ "$UPGRADE_NEEDED" = true ]; then
     echo -e "${BLUE}Updating Neovim...${NC}"
     
-    case $OS in
+    case "$OS" in
         arch|cachyos|manjaro)
             sudo pacman -S --needed --noconfirm neovim
             ;;
@@ -109,14 +118,18 @@ if [ "$UPGRADE_NEEDED" = true ]; then
 
             if [ "$NEED_APPIMAGE" = true ]; then
                 echo -e "${BLUE}Downloading latest Neovim Nightly AppImage (x86_64)...${NC}"
-                curl -fLO https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.appimage
-                chmod +x nvim-linux-x86_64.appimage
+                TEMP_APPIMAGE=$(mktemp)
+                curl -fLo "$TEMP_APPIMAGE" https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.appimage
+                chmod +x "$TEMP_APPIMAGE"
                 
                 # Explicitly remove old version to ensure clean slate
-                sudo rm -f /usr/bin/nvim /usr/local/bin/nvim 2>/dev/null || true
+                # Move first to a backup if exists to prevent "Text file busy" errors
+                if [ -f /usr/bin/nvim ]; then
+                    sudo mv /usr/bin/nvim /usr/bin/nvim.old 2>/dev/null || true
+                fi
                 
-                # Ensure /usr/bin/nvim is the AppImage for Kali/Fallback
-                sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
+                sudo mv "$TEMP_APPIMAGE" /usr/bin/nvim
+                sudo rm -f /usr/bin/nvim.old /usr/local/bin/nvim 2>/dev/null || true
                 echo -e "${GREEN}✅ Neovim Nightly installed via AppImage.${NC}"
             fi
             ;;
@@ -145,13 +158,16 @@ if [ "$UPGRADE_NEEDED" = true ]; then
         *)
             # Fallback to AppImage only if no repo available
             echo -e "${BLUE}Downloading latest Neovim AppImage (x86_64)...${NC}"
-            curl -fLO https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
-            chmod +x nvim-linux-x86_64.appimage
+            TEMP_APPIMAGE=$(mktemp)
+            curl -fLo "$TEMP_APPIMAGE" https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.appimage
+            chmod +x "$TEMP_APPIMAGE"
             
-            # Explicitly remove old version to ensure clean slate
-            sudo rm -f /usr/bin/nvim /usr/local/bin/nvim 2>/dev/null || true
-            
-            sudo mv nvim-linux-x86_64.appimage /usr/bin/nvim
+            # Atomic update logic
+            if [ -f /usr/bin/nvim ]; then
+                sudo mv /usr/bin/nvim /usr/bin/nvim.old 2>/dev/null || true
+            fi
+            sudo mv "$TEMP_APPIMAGE" /usr/bin/nvim
+            sudo rm -f /usr/bin/nvim.old /usr/local/bin/nvim 2>/dev/null || true
             ;;
     esac
     echo -e "${GREEN}✅ Neovim upgraded successfully.${NC}"
