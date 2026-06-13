@@ -1,5 +1,7 @@
 # LazyChad 🚀
 
+> 📄 Case study & write-up: **[mistan.dev/projects/lazychad](https://mistan.dev/projects/lazychad/)**
+
 **Luminous & Lazy — The Intelligent Neovim Project.**
 
 LazyChad is a high-performance, aesthetically pleasing Neovim configuration built on the legendary NvChad foundation. It is designed for those who want the beauty of NvChad but are far too lazy to actually configure it.
