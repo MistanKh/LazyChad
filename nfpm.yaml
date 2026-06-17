@@ -44,7 +44,6 @@ scripts:
 
 # Dependencies that exist across Arch, Debian, and Fedora
 depends:
-  - neovim
   - git
   - ripgrep
   - curl
@@ -52,3 +51,12 @@ depends:
   - make
   - unzip
   - gcc
+
+# neovim is intentionally NOT a hard dependency on Debian/Kali.
+# Kali's repo neovim is too old for nvim-treesitter (needs 0.12+), so users
+# install the latest via Kali-Scripts to /usr/local. A hard `Depends: neovim`
+# would make apt cascade-remove LazyChad when that repo package is removed, and
+# drag the stale package back on reinstall. `lazychad-deps` ensures a new-enough
+# nvim is present; this only expresses a soft preference.
+recommends:
+  - neovim
