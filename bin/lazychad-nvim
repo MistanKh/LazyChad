@@ -5,8 +5,6 @@
 # PATH). Tarball-first, arch-aware, with native package-manager fallback.
 # Run as a normal user; escalates with sudo per-command.
 
-set -euo pipefail
-
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
 
 # ---- pure helpers (sourceable for tests) ----
@@ -31,7 +29,7 @@ get_installed_version() {
 
 get_latest_version() {
     curl -fsSL https://github.com/neovim/neovim/releases/latest \
-        | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1
+        | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo ""
 }
 
 detect_os() {
@@ -49,5 +47,6 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -euo pipefail
     main "$@"
 fi
