@@ -23,4 +23,10 @@ assert_eq "$(nvim_download_url nvim-linux-x86_64 0.12.0)" \
   "https://github.com/neovim/neovim/releases/download/v0.12.0/nvim-linux-x86_64.tar.gz" \
   "nvim_download_url has v prefix"
 
+# cleanup_manual must succeed even when nothing exists (sudo/rm stubbed)
+sudo() { "$@"; }            # drop the privilege escalation in tests
+rm() { :; }                 # no-op rm so the test never deletes anything
+assert_eq "$(cleanup_manual >/dev/null 2>&1; echo $?)" "0" "cleanup_manual returns 0 when clean"
+unset -f sudo rm
+
 exit $fail

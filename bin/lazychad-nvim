@@ -41,9 +41,107 @@ detect_os() {
     fi
 }
 
-# ---- main (added in later steps) ----
+# ---- actions ----
+
+cleanup_manual() {
+    if [ -d /usr/local/nvim ]; then
+        echo -e "${BLUE}Removing old manual install /usr/local/nvim...${NC}"
+        sudo rm -rf /usr/local/nvim
+    fi
+    if [ -f /usr/bin/nvim.bak ]; then
+        echo -e "${BLUE}Removing /usr/bin/nvim.bak...${NC}"
+        sudo rm -f /usr/bin/nvim.bak
+    fi
+    return 0
+}
+
+note_apt_neovim() {
+    if command -v dpkg >/dev/null 2>&1 && dpkg -l neovim 2>/dev/null | grep -q '^ii'; then
+        echo -e "${YELLOW}Note: apt 'neovim' package present; it will be shadowed by the${NC}"
+        echo -e "${YELLOW}      /usr/local install. Leaving it in place (no apt removal).${NC}"
+    fi
+}
+
+manual_help() {
+    echo -e "${RED}❌ Could not install Neovim automatically.${NC}"
+    echo "Install the latest manually from:"
+    echo "  https://github.com/neovim/neovim/releases/latest"
+}
+
+native_install_neovim() {
+    local os; os="$(detect_os)"
+    echo -e "${BLUE}Falling back to native package manager for $os...${NC}"
+    case "$os" in
+        arch|cachyos|manjaro) sudo pacman -S --needed --noconfirm neovim ;;
+        fedora)               sudo dnf install -y neovim ;;
+        debian|ubuntu|pop|kali) sudo apt-get update && sudo apt-get install -y neovim ;;
+        *)                    return 1 ;;
+    esac
+}
+
+install_tarball() {
+    # $1=asset  $2=version
+    local asset="$1" version="$2" url tmp
+    url="$(nvim_download_url "$asset" "$version")"
+    tmp="$(mktemp -d)"
+    echo -e "${BLUE}Downloading Neovim v$version ($asset)...${NC}"
+    if ! curl -fSL "$url" -o "$tmp/$asset.tar.gz"; then rm -rf "$tmp"; return 1; fi
+    echo -e "${BLUE}Extracting to /usr/local...${NC}"
+    if ! sudo tar -xzf "$tmp/$asset.tar.gz" -C /usr/local --strip-components=1; then rm -rf "$tmp"; return 1; fi
+    rm -rf "$tmp"
+    return 0
+}
+
+install_or_update() {
+    local current latest asset
+    echo -e "${BOLD}=== LazyChad Neovim Installer ===${NC}"
+    current="$(get_installed_version)"
+    asset="$(detect_arch)"
+
+    if [ "$asset" = "unsupported" ]; then
+        echo -e "${YELLOW}Unsupported CPU arch ($(uname -m)).${NC}"
+        if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
+    fi
+
+    latest="$(get_latest_version || true)"
+    if [ -z "${latest:-}" ]; then
+        echo -e "${YELLOW}Could not determine the latest version (network?).${NC}"
+        if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
+    fi
+
+    echo -e "Installed: ${current}    Latest: ${latest}"
+    if [ "$current" = "$latest" ]; then
+        echo -e "${GREEN}✅ Already on the latest Neovim (v$latest).${NC}"
+        return 0
+    fi
+
+    cleanup_manual
+    note_apt_neovim
+    if install_tarball "$asset" "$latest"; then
+        echo -e "${GREEN}✅ Neovim v$latest installed to /usr/local.${NC}"
+        nvim --version | head -1
+        return 0
+    fi
+
+    echo -e "${RED}⚠️ Tarball install failed. Trying native package manager...${NC}"
+    if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
+}
+
+uninstall_nvim() {
+    echo -e "${BLUE}Removing Neovim installed under /usr/local...${NC}"
+    sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim
+    cleanup_manual
+    echo -e "${GREEN}✅ Neovim (tarball/manual install) removed.${NC}"
+    echo -e "${YELLOW}Any apt/pacman 'neovim' package was left untouched.${NC}"
+}
+
 main() {
-    echo "lazychad-nvim: not implemented yet"
+    case "${1:-install}" in
+        -r|--uninstall)                   uninstall_nvim ;;
+        -c|--cleanup)                     cleanup_manual; echo -e "${GREEN}Manual-install cleanup done.${NC}" ;;
+        -i|--install|-u|--update|install|update) install_or_update ;;
+        *)                                install_or_update ;;
+    esac
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
