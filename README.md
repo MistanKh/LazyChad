@@ -105,6 +105,34 @@ lazychad-deps
 
 ---
 
+## Managing Neovim
+
+LazyChad bundles `lazychad-nvim`, which installs the latest **stable** Neovim
+from the official GitHub release tarball into `/usr/local` (so it shadows any
+distro `neovim` package via `PATH`). It detects your CPU (x86_64 / arm64) and
+falls back to your distro package manager if the download is unavailable.
+
+```bash
+lazychad-nvim            # install or update to the latest Neovim
+lazychad-nvim --uninstall  # remove the /usr/local Neovim install
+```
+
+`lazychad-deps` runs this automatically as its Neovim step.
+
+## Uninstalling
+
+```bash
+lazychad-uninstall       # confirm + optional config backup, then remove
+lazychad-uninstall --yes # skip prompts (scripted use)
+```
+
+This removes the bundled Neovim, the LazyChad binaries and files, and the
+per-user LazyChad directories. It detects whether LazyChad was installed via
+`apt`/`pacman` or manually and removes it the matching way. Shared tools
+(Node, Rust, Neovide, fonts) are **not** removed.
+
+---
+
 ## 🚀 Getting Started
 
 Once installed, simply type:
