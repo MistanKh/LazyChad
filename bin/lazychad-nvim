@@ -129,7 +129,10 @@ install_or_update() {
 
 uninstall_nvim() {
     echo -e "${BLUE}Removing Neovim installed under /usr/local...${NC}"
-    sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim
+    if ! sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim; then
+        echo -e "${RED}⚠️ Failed to remove some /usr/local Neovim files (permissions?).${NC}"
+        return 1
+    fi
     cleanup_manual
     echo -e "${GREEN}✅ Neovim (tarball/manual install) removed.${NC}"
     echo -e "${YELLOW}Any apt/pacman 'neovim' package was left untouched.${NC}"
