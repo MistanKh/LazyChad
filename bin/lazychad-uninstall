@@ -7,6 +7,7 @@
 set -uo pipefail
 
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 parse_yes() {
     case "${1:-}" in
@@ -48,8 +49,8 @@ remove_neovim() {
     local installer=""
     if command -v lazychad-nvim >/dev/null 2>&1; then
         installer="lazychad-nvim"
-    elif [ -x "$(dirname "$0")/lazychad-nvim" ]; then
-        installer="$(dirname "$0")/lazychad-nvim"
+    elif [ -x "$SCRIPT_DIR/lazychad-nvim" ]; then
+        installer="$SCRIPT_DIR/lazychad-nvim"
     fi
     if [ -n "$installer" ]; then
         "$installer" --uninstall
@@ -70,8 +71,10 @@ remove_lazychad() {
         echo -e "${BLUE}Removing manual LazyChad install...${NC}"
         sudo rm -f /usr/bin/lchad /usr/bin/lazychad-deps /usr/bin/lazychad-nvim /usr/bin/lazychad-uninstall
         sudo rm -rf /usr/share/lazychad /usr/share/doc/lazychad /usr/share/licenses/lazychad
-        remove_user_dirs
     fi
+    # Belt-and-suspenders: package postremove hooks usually clear user dirs,
+    # but run this unconditionally so nothing is left behind on any install type.
+    remove_user_dirs
 }
 
 main() {
