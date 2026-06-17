@@ -24,6 +24,13 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 
 ## 📥 Installation
 
+> [!IMPORTANT]
+> **Whatever method you use, you must run `lazychad-deps` afterward.** Installing
+> the package alone does **not** give you a recent Neovim — `lazychad-deps`
+> installs the latest stable Neovim (0.12+, required by `nvim-treesitter`) via the
+> bundled `lazychad-nvim` script, plus the Node/Python/Rust providers. Without it
+> you'll be left on your distro's (often outdated) Neovim.
+
 ### Option 1: Arch Linux (AUR)
 If you are on Arch Linux or CachyOS, you can install LazyChad directly from the AUR. 
 
@@ -41,13 +48,15 @@ paru -S lazychad
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
 sudo apt install ./lazychad_1.0.3-1_all.deb
+lazychad-deps   # required: installs the latest Neovim + providers
 ```
-*Note: `neovim` is a **recommended** (not required) dependency. `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script, so the package never drags in an outdated repo version — and removing a system `neovim` won't cascade-remove LazyChad.*
+*Note: `neovim` is a **recommended** (not required) dependency, so apt may pull in your distro's older Neovim — that's harmless. `lazychad-deps` then installs the latest stable Neovim to `/usr/local`, which shadows it via `PATH`. Keeping `neovim` a recommend (not a hard depend) is also what stops a system `neovim` removal from cascade-removing LazyChad.*
 
 ### Option 3: Fedora / RHEL (.rpm)
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
 sudo dnf install ./lazychad-1.0.3-1.noarch.rpm
+lazychad-deps   # required: installs the latest Neovim + providers
 ```
 *Note: `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
 
@@ -75,7 +84,7 @@ fish_add_path ~/.config/LazyChad/bin
 ```
 
 #### 3. Install Dependencies
-Run the built-in dependency script to set up Node, Python, and Rust providers:
+Run the built-in dependency script to install the latest Neovim (0.12+) and set up the Node, Python, and Rust providers:
 ```bash
 lazychad-deps
 ```

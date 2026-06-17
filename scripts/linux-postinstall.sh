@@ -2,7 +2,12 @@
 # Post-installation script for Debian/RPM packages
 
 echo "==> LazyChad has been successfully installed."
-echo "==> To complete the setup (Node, Python, Rust providers), please run:"
-echo "    lazychad-deps"
+echo ""
+echo "==> REQUIRED NEXT STEP: run 'lazychad-deps' as your normal user."
+echo "    Your distro's Neovim is likely too old (LazyChad needs 0.12+)."
+echo "    'lazychad-deps' installs the latest stable Neovim to /usr/local"
+echo "    and sets up the Node, Python, and Rust providers:"
+echo ""
+echo "        lazychad-deps"
 echo ""
 echo "==> Then start the editor with: lchad"
