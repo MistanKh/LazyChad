@@ -1,0 +1,103 @@
+#!/bin/bash
+# LazyChad Uninstaller — full, install-method-aware removal.
+# Removes the /usr/local Neovim install, LazyChad binaries/files, and user
+# dirs. Leaves shared deps (Node, Rust, Neovide, fonts) untouched.
+# Confirms and offers a config backup first. Run as a normal user; uses sudo.
+
+set -uo pipefail
+
+BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
+
+parse_yes() {
+    case "${1:-}" in
+        -y|--yes) echo "true" ;;
+        *)        echo "false" ;;
+    esac
+}
+
+confirm() {
+    # $1=prompt ; honours global ASSUME_YES
+    if [ "${ASSUME_YES:-false}" = "true" ]; then return 0; fi
+    read -p "$1 (y/N) " -n 1 -r; echo
+    [[ $REPLY =~ ^[Yy]$ ]]
+}
+
+backup_user_config() {
+    local cfg="$HOME/.config/LazyChad"
+    if [ -d "$cfg" ] && confirm "Back up $cfg before removing?"; then
+        local dest="${cfg}_backup_$(date +%Y%m%d_%H%M%S)"
+        cp -a "$cfg" "$dest"
+        echo -e "${GREEN}🗄️  Backed up to $dest${NC}"
+    fi
+}
+
+remove_user_dirs() {
+    local home sub
+    for home in /home/* /root; do
+        [ -d "$home" ] || continue
+        for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
+            if [ -d "$home/$sub" ]; then
+                sudo rm -rf "$home/$sub"
+                echo "  -> removed $home/$sub"
+            fi
+        done
+    done
+}
+
+remove_neovim() {
+    local installer=""
+    if command -v lazychad-nvim >/dev/null 2>&1; then
+        installer="lazychad-nvim"
+    elif [ -x "$(dirname "$0")/lazychad-nvim" ]; then
+        installer="$(dirname "$0")/lazychad-nvim"
+    fi
+    if [ -n "$installer" ]; then
+        "$installer" --uninstall
+    else
+        echo -e "${BLUE}Removing Neovim under /usr/local directly...${NC}"
+        sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim /usr/local/nvim
+    fi
+}
+
+remove_lazychad() {
+    if command -v dpkg >/dev/null 2>&1 && dpkg -S /usr/bin/lchad >/dev/null 2>&1; then
+        echo -e "${BLUE}Detected dpkg install. Removing the lazychad package...${NC}"
+        sudo apt-get remove -y lazychad
+    elif command -v pacman >/dev/null 2>&1 && pacman -Qo /usr/bin/lchad >/dev/null 2>&1; then
+        echo -e "${BLUE}Detected pacman install. Removing the lazychad package...${NC}"
+        sudo pacman -R --noconfirm lazychad
+    else
+        echo -e "${BLUE}Removing manual LazyChad install...${NC}"
+        sudo rm -f /usr/bin/lchad /usr/bin/lazychad-deps /usr/bin/lazychad-nvim /usr/bin/lazychad-uninstall
+        sudo rm -rf /usr/share/lazychad /usr/share/doc/lazychad /usr/share/licenses/lazychad
+        remove_user_dirs
+    fi
+}
+
+main() {
+    ASSUME_YES="$(parse_yes "${1:-}")"
+
+    echo -e "${BOLD}=== LazyChad Uninstaller ===${NC}"
+    echo "The following will be removed:"
+    echo "  - Neovim installed under /usr/local (bin/lib/share/nvim)"
+    echo "  - LazyChad binaries: lchad, lazychad-deps, lazychad-nvim, lazychad-uninstall"
+    echo "  - System files: /usr/share/lazychad, /usr/share/doc/lazychad, /usr/share/licenses/lazychad"
+    echo "  - User dirs: ~/.config/LazyChad and ~/.local/share|state, ~/.cache/LazyChad (all users)"
+    echo -e "${YELLOW}Shared deps (Node, Rust, Neovide, fonts, -dev packages) will NOT be removed.${NC}"
+    echo
+
+    if ! confirm "Proceed with uninstall?"; then
+        echo "Aborted."
+        exit 0
+    fi
+
+    backup_user_config   # backup BEFORE any package-manager postremove runs
+    remove_neovim        # remove nvim while lazychad-nvim still exists
+    remove_lazychad
+
+    echo -e "${GREEN}✅ LazyChad has been uninstalled.${NC}"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
