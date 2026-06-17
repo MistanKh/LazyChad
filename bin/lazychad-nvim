@@ -1,0 +1,53 @@
+#!/bin/bash
+# LazyChad Neovim Installer
+# Installs/updates/uninstalls the latest stable Neovim using the official
+# GitHub release tarball into /usr/local (shadowing any apt/pacman nvim via
+# PATH). Tarball-first, arch-aware, with native package-manager fallback.
+# Run as a normal user; escalates with sudo per-command.
+
+set -euo pipefail
+
+BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
+
+# ---- pure helpers (sourceable for tests) ----
+
+detect_arch() {
+    case "$(uname -m)" in
+        x86_64|amd64)  echo "nvim-linux-x86_64" ;;
+        aarch64|arm64) echo "nvim-linux-arm64" ;;
+        *)             echo "unsupported" ;;
+    esac
+}
+
+nvim_download_url() {
+    # $1=asset base  $2=version (X.Y.Z, no leading v)
+    echo "https://github.com/neovim/neovim/releases/download/v$2/$1.tar.gz"
+}
+
+get_installed_version() {
+    command -v nvim >/dev/null 2>&1 || { echo "none"; return; }
+    nvim --version 2>/dev/null | head -1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' || echo "none"
+}
+
+get_latest_version() {
+    curl -fsSL https://github.com/neovim/neovim/releases/latest \
+        | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1
+}
+
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        # shellcheck disable=SC1091
+        . /etc/os-release; echo "${ID:-unknown}"
+    else
+        echo "unknown"
+    fi
+}
+
+# ---- main (added in later steps) ----
+main() {
+    echo "lazychad-nvim: not implemented yet"
+}
+
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    main "$@"
+fi
