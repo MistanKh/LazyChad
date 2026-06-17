@@ -40,7 +40,7 @@ paru -S lazychad
 ### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.0.3_all.deb
+sudo apt install ./lazychad_1.0.3-1_all.deb
 ```
 *Note: `neovim` is a **recommended** (not required) dependency. `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script, so the package never drags in an outdated repo version — and removing a system `neovim` won't cascade-remove LazyChad.*
 
