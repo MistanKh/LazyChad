@@ -12,7 +12,7 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 
 - **🧠 Intelligent Neural Mappings**: A dynamic toolchain system that live-scans the Mason registry to recommend LSPs, formatters, and linters for every filetype.
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
-- **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts and a 120s safety timeout for repository additions.
+- **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated failed tool-install attempts during toolchain setup.
 - **🛡️ Cross-Distro Intelligence**: Bundles `lazychad-nvim`, which installs the latest stable Neovim from the official GitHub release tarball on any distro (x86_64 / arm64) — no PPAs, COPRs, or AppImages to break, and no fight with an outdated repo package.
 - **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
