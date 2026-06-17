@@ -101,7 +101,6 @@ Run the dependency script to ensure your Neovim, Node, and Python providers are 
 ```bash
 lazychad-deps
 ```
-*On Kali Linux or AppImage installations, the script will ask if you want to refresh the latest Nightly build.*
 
 ---
 
