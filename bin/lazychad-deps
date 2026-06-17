@@ -90,8 +90,31 @@ if [ "$UPGRADE_NEEDED" = true ]; then
             ;;
         debian|ubuntu|pop|kali)
             if [[ "$OS" == "kali" ]]; then
+                # Recommended path on Kali: use the dedicated Kali-Scripts
+                # installer, which fetches the latest stable Neovim tarball into
+                # /usr/local (shadowing the stale apt package via PATH) without
+                # touching the apt 'neovim' package. This avoids fighting apt and
+                # is the maintainer's preferred method on Kali.
+                KALI_HANDLED=false
+                echo -e "${YELLOW}On Kali, the recommended way to get the latest Neovim is Kali-Scripts:${NC}"
+                echo -e "  ${BOLD}https://github.com/MistanKh/Kali-Scripts${NC} (install_neovim.sh)"
+                read -p "Install/upgrade Neovim via Kali-Scripts now? (Y/n) " -n 1 -r
+                echo
+                if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+                    KALI_NVIM_URL="https://raw.githubusercontent.com/MistanKh/Kali-Scripts/main/install_neovim.sh"
+                    echo -e "${BLUE}Fetching and running Kali-Scripts install_neovim.sh...${NC}"
+                    if curl -fsSL "$KALI_NVIM_URL" | sudo bash; then
+                        echo -e "${GREEN}✅ Neovim installed via Kali-Scripts.${NC}"
+                        KALI_HANDLED=true
+                        NEED_APPIMAGE=false
+                    else
+                        echo -e "${RED}⚠️ Kali-Scripts install failed. Falling back to Debian Experimental...${NC}"
+                    fi
+                fi
+
+                if [ "$KALI_HANDLED" = false ]; then
                 echo -e "${BLUE}Detected Kali Linux. Setting up Debian Experimental for Native Neovim...${NC}"
-                
+
                 # 1. Add Experimental Repo
                 echo "deb http://deb.debian.org/debian experimental main" | sudo tee /etc/apt/sources.list.d/experimental.list
                 
@@ -109,6 +132,7 @@ if [ "$UPGRADE_NEEDED" = true ]; then
                 else
                     NEED_APPIMAGE=false
                 fi
+                fi # end KALI_HANDLED fallback
             else
                 echo -e "${BLUE}Updating system package lists...${NC}"
                 sudo apt-get update
