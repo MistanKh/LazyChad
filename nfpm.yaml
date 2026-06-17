@@ -20,6 +20,10 @@ contents:
     dst: /usr/bin/lchad
   - src: ./bin/lazychad-deps
     dst: /usr/bin/lazychad-deps
+  - src: ./bin/lazychad-nvim
+    dst: /usr/bin/lazychad-nvim
+  - src: ./bin/lazychad-uninstall
+    dst: /usr/bin/lazychad-uninstall
   
   # Core Config Files
   - src: ./init.lua
@@ -44,7 +48,6 @@ scripts:
 
 # Dependencies that exist across Arch, Debian, and Fedora
 depends:
-  - neovim
   - git
   - ripgrep
   - curl
@@ -52,3 +55,10 @@ depends:
   - make
   - unzip
   - gcc
+
+# neovim is intentionally a soft recommendation, not a hard dependency.
+# lazychad-nvim installs the latest Neovim to /usr/local; a hard Depends would
+# let apt cascade-remove LazyChad when an external neovim is removed and drag
+# the stale repo package back on reinstall.
+recommends:
+  - neovim
