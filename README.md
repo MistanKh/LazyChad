@@ -13,12 +13,12 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 - **🧠 Intelligent Neural Mappings**: A dynamic toolchain system that live-scans the Mason registry to recommend LSPs, formatters, and linters for every filetype.
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
 - **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated installation attempts and a 120s safety timeout for repository additions.
-- **🛡️ Cross-Distro Intelligence**: Automatically detects **Kali Linux** and other "Frankendebian" environments to safely install Neovim via AppImage instead of potentially breaking PPAs.
+- **🛡️ Cross-Distro Intelligence**: Bundles `lazychad-nvim`, which installs the latest stable Neovim from the official GitHub release tarball on any distro (x86_64 / arm64) — no PPAs, COPRs, or AppImages to break, and no fight with an outdated repo package.
 - **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
 - **🖼️ Neovide Optimized**: Pre-configured for the **Neovide** GUI with smooth 120Hz animations, "pixiedust" cursor effects, and perfect typography.
 - **🔡 Typography Ready**: Out-of-the-box support for **JetBrainsMono Nerd Font** for perfect icons and coding clarity.
-- **🚀 Future-Proof**: Native support for Neovim 0.11+ and the new `vim.lsp.config` API.
+- **🚀 Future-Proof**: Targets the latest stable Neovim (0.12+, as required by `nvim-treesitter`) and the new `vim.lsp.config` API.
 
 ---
 
@@ -40,16 +40,16 @@ paru -S lazychad
 ### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.0.0_all.deb
+sudo apt install ./lazychad_1.0.2_all.deb
 ```
-*Note: Kali Linux users will automatically get the AppImage version during `lazychad-deps` to ensure system stability.*
+*Note: `neovim` is a **recommended** (not required) dependency. `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script, so the package never drags in an outdated repo version — and removing a system `neovim` won't cascade-remove LazyChad.*
 
 ### Option 3: Fedora / RHEL (.rpm)
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo dnf install ./lazychad-1.0.0-1.noarch.rpm
+sudo dnf install ./lazychad-1.0.2-1.noarch.rpm
 ```
-*Note: Fedora users get the latest Neovim Nightly via the `agriffis` COPR repository.*
+*Note: `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
 
 ### Option 4: Manual Installation (All Linux/macOS)
 If you prefer to install manually, follow these steps:
@@ -104,7 +104,7 @@ lazychad-deps
 
 ---
 
-## Managing Neovim
+## 🛠️ Managing Neovim
 
 LazyChad bundles `lazychad-nvim`, which installs the latest **stable** Neovim
 from the official GitHub release tarball into `/usr/local` (so it shadows any
@@ -118,7 +118,9 @@ lazychad-nvim --uninstall  # remove the /usr/local Neovim install
 
 `lazychad-deps` runs this automatically as its Neovim step.
 
-## Uninstalling
+## 🗑️ Uninstalling
+
+The recommended way is the bundled uninstaller, which is install-method aware:
 
 ```bash
 lazychad-uninstall       # confirm + optional config backup, then remove
@@ -129,6 +131,23 @@ This removes the bundled Neovim, the LazyChad binaries and files, and the
 per-user LazyChad directories. It detects whether LazyChad was installed via
 `apt`/`pacman` or manually and removes it the matching way. Shared tools
 (Node, Rust, Neovide, fonts) are **not** removed.
+
+<details>
+<summary>Manual removal (if you didn't install the <code>lazychad-uninstall</code> script)</summary>
+
+```bash
+# Package installs:
+sudo pacman -R lazychad        # Arch / AUR
+sudo apt remove lazychad       # Debian / Ubuntu / Kali
+sudo dnf remove lazychad       # Fedora / RHEL
+
+# Config/data (all install types):
+rm -rf ~/.config/LazyChad ~/.local/share/LazyChad ~/.local/state/LazyChad ~/.cache/LazyChad
+
+# Bundled Neovim under /usr/local, if installed via lazychad-nvim:
+lazychad-nvim --uninstall
+```
+</details>
 
 ---
 
@@ -144,20 +163,6 @@ lchad
 2.  **Bootstrap Essentials**: Run `:MasonInstallAll` to install the base language server and formatter for your Neovim config.
 3.  **Open a File**: Open any code file (e.g., `main.py`).
 4.  **Pick Your Tools**: LazyChad will automatically prompt you to choose an LSP, Formatter, and Linter.
-
----
-
-## 🗑️ Uninstallation
-
-**If installed via AUR:**
-```bash
-sudo pacman -R lazychad
-```
-
-**If installed manually:**
-```bash
-rm -rf ~/.config/LazyChad ~/.local/share/LazyChad ~/.local/state/LazyChad ~/.cache/LazyChad
-```
 
 ---
 
