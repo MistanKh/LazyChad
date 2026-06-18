@@ -127,6 +127,10 @@ case $FAMILY in
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "curl" "gnupg" "ca-certificates"
             "fonts-jetbrains-mono" "python3" "python3-pip"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
+            # Runtime libs the prebuilt Neovide binary links against (not the -dev
+            # headers — those are only for the cargo build below).
+            "libfreetype6" "libfontconfig1" "libasound2" "libxcursor1"
+            "libxi6" "libxrandr2" "libgl1"
         )
         # Build deps for compiling Neovide from source (cargo fallback only).
         # 'libglut-dev' is the current name (was 'freeglut3-dev' on older Debian).
@@ -144,6 +148,9 @@ case $FAMILY in
             "nodejs" "npm" "git" "make" "unzip" "gcc" "gcc-c++" "cmake"
             "jetbrains-mono-fonts" "python3" "python3-pip"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
+            # Runtime libs the prebuilt Neovide binary links against.
+            "freetype" "fontconfig" "alsa-lib" "libXcursor"
+            "libXi" "libXrandr" "mesa-libGL"
         )
         NEOVIDE_BUILD_DEPS=(
             "fontconfig-devel" "freetype-devel" "libstdc++-static" "libstdc++-devel"
