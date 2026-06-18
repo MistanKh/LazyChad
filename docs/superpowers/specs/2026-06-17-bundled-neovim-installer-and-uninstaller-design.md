@@ -1,7 +1,13 @@
 # LazyChad: Bundled OS-Aware Neovim Installer + Uninstaller
 
 **Date:** 2026-06-17
-**Status:** Approved (design)
+**Status:** Approved (design) — implemented and shipped.
+
+> **Update (2026-06-18):** The standalone **Kali-Scripts** repo referenced below
+> has since been retired and deleted. Its `install_neovim.sh` lives on as the
+> bundled `bin/lazychad-nvim` described here; `install_gh.sh` (GitHub CLI) was
+> intentionally not carried over (`gh` is a one-line distro install). References
+> to Kali-Scripts as a live separate repo are historical context for this design.
 
 ## Problem
 
@@ -50,8 +56,9 @@ uninstaller. Remove the apt-package tug-of-war for good.
 ## Out of scope
 
 - Kali-Scripts' `install_gh.sh` (GitHub CLI) — not a LazyChad dependency.
-- Changes to the Kali-Scripts repo itself (deprecation / README pointer) — a
-  possible follow-up, not part of this work.
+- Changes to the Kali-Scripts repo itself — a possible follow-up, not part of
+  this work. *(Resolved 2026-06-18: the repo was retired and deleted outright
+  once its Neovim installer had been folded in here.)*
 - Removing shared toolchain dependencies on uninstall.
 
 ---

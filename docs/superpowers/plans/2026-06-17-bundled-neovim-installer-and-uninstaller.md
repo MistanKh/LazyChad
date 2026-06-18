@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Update (2026-06-18):** Implemented and shipped. The standalone Kali-Scripts repo this plan folds in has since been retired and deleted — its Neovim installer now lives here as `bin/lazychad-nvim`. Kali-Scripts references below are historical context.
+
 **Goal:** Fold the Kali-Scripts Neovim installer into LazyChad as a bundled, OS-aware script, standardize on the GitHub-release-tarball method everywhere, delegate the `lazychad-deps` Neovim step to it, and add a clean, install-method-aware uninstaller.
 
 **Architecture:** Two new standalone Bash scripts in `bin/` — `lazychad-nvim` (install/update/uninstall Neovim, tarball-first with native package-manager fallback, x86_64+arm64) and `lazychad-uninstall` (full clean-slate removal). `lazychad-deps` is slimmed to delegate its Neovim step to `lazychad-nvim`. Both scripts run as a normal user and escalate with `sudo` per-command. Pure logic functions are written behind a `BASH_SOURCE`/`$0` guard so they can be sourced and unit-tested.
