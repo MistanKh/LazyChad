@@ -170,20 +170,42 @@ else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
 fi
 
-# 4. Neovide (Build from source for Debian/Fedora)
+# 4. Neovide GUI
 echo -e "\n${BOLD}${YELLOW}[4/6] Checking Neovide GUI...${NC}"
-if ! exists neovide; then
-    if [[ "$FAMILY" == "arch" ]]; then
-        echo -e "${BLUE}Installing Neovide via pacman...${NC}"
-        sudo pacman -S --needed --noconfirm neovide || warn_fail "Neovide install via pacman failed"
-    elif exists cargo; then
-        echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
-        cargo install --git https://github.com/neovide/neovide || warn_fail "Neovide build from source failed"
-    else
-        warn_fail "Skipping Neovide: cargo is not available"
-    fi
-else
+if exists neovide; then
     echo -e "${GREEN}✅ Neovide is already installed.${NC}"
+elif [[ "$FAMILY" == "arch" ]]; then
+    echo -e "${BLUE}Installing Neovide via pacman...${NC}"
+    sudo pacman -S --needed --noconfirm neovide || warn_fail "Neovide install via pacman failed"
+else
+    # Prefer the official prebuilt x86_64 binary (fast, no compile); it's
+    # dynamically linked but the runtime libs come from the packages installed
+    # above. Fall back to building from source with cargo (the official method)
+    # for other architectures or if the download fails.
+    NEOVIDE_OK=false
+    if [ "$(uname -m)" = "x86_64" ]; then
+        echo -e "${BLUE}Installing the official prebuilt Neovide binary...${NC}"
+        nv_tmp="$(mktemp -d)"
+        if curl -fSL "https://github.com/neovide/neovide/releases/latest/download/neovide-linux-x86_64.tar" \
+                -o "$nv_tmp/neovide.tar" \
+           && tar -xf "$nv_tmp/neovide.tar" -C "$nv_tmp" \
+           && sudo install -Dm755 "$nv_tmp/neovide" /usr/local/bin/neovide; then
+            echo -e "${GREEN}✅ Neovide installed to /usr/local/bin/neovide.${NC}"
+            NEOVIDE_OK=true
+        else
+            echo -e "${YELLOW}Prebuilt download failed; will try building from source...${NC}"
+        fi
+        rm -rf "$nv_tmp"
+    fi
+    if [ "$NEOVIDE_OK" = false ]; then
+        if exists cargo; then
+            echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
+            cargo install --git https://github.com/neovide/neovide.git \
+                || warn_fail "Neovide build from source failed"
+        else
+            warn_fail "Skipping Neovide: no prebuilt for $(uname -m) and cargo not available"
+        fi
+    fi
 fi
 
 # 5. Global NPM Packages
