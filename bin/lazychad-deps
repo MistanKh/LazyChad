@@ -17,6 +17,26 @@ NC="\033[0m" # No Color
 FAILED_STEPS=()
 warn_fail() { echo -e "${RED}⚠️  $1${NC}"; FAILED_STEPS+=("$1"); }
 
+# Install a list of packages best-effort. Try one batch first (fast); if that
+# fails — usually a single missing/renamed package aborting the whole apt/dnf
+# run — retry each package individually so the good ones still land, and report
+# only the ones that genuinely couldn't be installed. Uses the global PKG_MANAGER.
+install_resilient() {
+    local label="$1"; shift
+    [ "$#" -eq 0 ] && return 0
+    if $PKG_MANAGER "$@"; then
+        return 0
+    fi
+    echo -e "${YELLOW}Batch install hit an error; retrying packages individually...${NC}"
+    local p failed=()
+    for p in "$@"; do
+        $PKG_MANAGER "$p" || failed+=("$p")
+    done
+    if [ "${#failed[@]}" -gt 0 ]; then
+        warn_fail "$label: could not install (may not exist on your distro): ${failed[*]}"
+    fi
+}
+
 echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
 echo -e "This script will detect your OS and install required external tools.\n"
 
@@ -82,6 +102,11 @@ fi
 # 2. System Packages
 echo -e "\n${BOLD}${YELLOW}[2/6] Checking System Packages...${NC}"
 
+# Neovide build deps are only needed for the rare cargo fallback (step 4 installs
+# Neovide from the official prebuilt binary on x86_64). Kept out of the core list
+# so a stale/renamed dev package can't block the essentials.
+NEOVIDE_BUILD_DEPS=()
+
 case $FAMILY in
     arch)
         PKG_MANAGER="sudo pacman -S --needed --noconfirm"
@@ -100,24 +125,29 @@ case $FAMILY in
         sudo apt-get update || warn_fail "apt-get update failed (network?); package install may be incomplete"
         DEPS=(
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "curl" "gnupg" "ca-certificates"
+            "fonts-jetbrains-mono" "python3" "python3-pip"
+            "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
+        )
+        # Build deps for compiling Neovide from source (cargo fallback only).
+        # 'libglut-dev' is the current name (was 'freeglut3-dev' on older Debian).
+        NEOVIDE_BUILD_DEPS=(
             "gcc-multilib" "g++-multilib" "libssl-dev" "pkg-config" "libfreetype6-dev"
             "libasound2-dev" "libexpat1-dev" "libxcb-composite0-dev" "libbz2-dev"
-            "libsndio-dev" "freeglut3-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
-            "libxcursor-dev" "fonts-jetbrains-mono" "python3" "python3-pip"
-            "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
+            "libsndio-dev" "libglut-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
+            "libxcursor-dev"
         )
         check_installed() { dpkg -l "$1" >/dev/null 2>&1; }
         ;;
     fedora)
         PKG_MANAGER="sudo dnf install -y"
         DEPS=(
-            "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "fontconfig-devel"
-            "freetype-devel" "libstdc++-static" "libstdc++-devel"
+            "nodejs" "npm" "git" "make" "unzip" "gcc" "gcc-c++" "cmake"
             "jetbrains-mono-fonts" "python3" "python3-pip"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
-        sudo dnf install -y gcc gcc-c++ make cmake automake autoconf binutils \
-            || warn_fail "Some Fedora build tools failed to install"
+        NEOVIDE_BUILD_DEPS=(
+            "fontconfig-devel" "freetype-devel" "libstdc++-static" "libstdc++-devel"
+        )
         check_installed() { rpm -q "$1" >/dev/null 2>&1; }
         ;;
     *)
@@ -135,8 +165,7 @@ done
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo -e "${BLUE}Installing missing system packages via $OS package manager...${NC}"
-    $PKG_MANAGER "${MISSING_DEPS[@]}" \
-        || warn_fail "Some system packages failed to install: ${MISSING_DEPS[*]}"
+    install_resilient "System packages" "${MISSING_DEPS[@]}"
 else
     echo -e "${GREEN}✅ All system packages are already installed.${NC}"
 fi
@@ -199,6 +228,10 @@ else
     fi
     if [ "$NEOVIDE_OK" = false ]; then
         if exists cargo; then
+            if [ "${#NEOVIDE_BUILD_DEPS[@]}" -gt 0 ]; then
+                echo -e "${BLUE}Installing Neovide build dependencies...${NC}"
+                install_resilient "Neovide build deps" "${NEOVIDE_BUILD_DEPS[@]}"
+            fi
             echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
             cargo install --git https://github.com/neovide/neovide.git \
                 || warn_fail "Neovide build from source failed"
