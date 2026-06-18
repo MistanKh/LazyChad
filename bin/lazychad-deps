@@ -88,8 +88,8 @@ case $FAMILY in
         DEPS=(
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake"
             "ttf-jetbrains-mono-nerd" "neovide"
-            "python" "python-pip" "python-pipx" 
-            "ripgrep" "fd" "lazygit" 
+            "python" "python-pip"
+            "ripgrep" "fd" "lazygit"
             "lua51" "luarocks" "lua-jsregexp"
             "wl-clipboard" "xclip"
         )
@@ -103,7 +103,7 @@ case $FAMILY in
             "gcc-multilib" "g++-multilib" "libssl-dev" "pkg-config" "libfreetype6-dev"
             "libasound2-dev" "libexpat1-dev" "libxcb-composite0-dev" "libbz2-dev"
             "libsndio-dev" "freeglut3-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
-            "libxcursor-dev" "fonts-jetbrains-mono" "python3" "python3-pip" "pipx"
+            "libxcursor-dev" "fonts-jetbrains-mono" "python3" "python3-pip"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
         check_installed() { dpkg -l "$1" >/dev/null 2>&1; }
@@ -113,7 +113,7 @@ case $FAMILY in
         DEPS=(
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "fontconfig-devel"
             "freetype-devel" "libstdc++-static" "libstdc++-devel"
-            "jetbrains-mono-fonts" "python3" "python3-pip" "pipx"
+            "jetbrains-mono-fonts" "python3" "python3-pip"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
         sudo dnf install -y gcc gcc-c++ make cmake automake autoconf binutils \
@@ -207,16 +207,31 @@ else
 fi
 
 # 6. Python Provider (pynvim)
-echo -e "\n${BOLD}${YELLOW}[6/6] Checking Python Providers (pynvim)...${NC}"
-if exists pipx; then
-    if ! pipx list 2>/dev/null | grep -q "pynvim"; then
-        echo -e "${BLUE}Installing pynvim via pipx...${NC}"
-        pipx install pynvim --force || warn_fail "pipx install pynvim failed"
-    else
+# Installed with pip into the *user site* so the system python3 that Neovim uses
+# can import it -> `:checkhealth provider` goes green. (pipx isolates packages in
+# their own venv, where Neovim can't see them — wrong tool for a library.)
+echo -e "\n${BOLD}${YELLOW}[6/6] Checking Python Provider (pynvim)...${NC}"
+if exists python3; then
+    if python3 -c "import pynvim" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Python provider (pynvim) is already installed.${NC}"
+    else
+        echo -e "${BLUE}Installing pynvim via pip (user site)...${NC}"
+        # Plain --user first; on PEP 668 'externally-managed' distros (Kali,
+        # Debian 12+, recent Fedora/Arch) retry with --break-system-packages,
+        # which still only touches the user site, not system packages.
+        if python3 -m pip install --user --upgrade pynvim >/dev/null 2>&1 \
+           || python3 -m pip install --user --upgrade --break-system-packages pynvim; then
+            if python3 -c "import pynvim" >/dev/null 2>&1; then
+                echo -e "${GREEN}✅ pynvim installed.${NC}"
+            else
+                warn_fail "pynvim installed but not importable by python3 (check your PATH/python)"
+            fi
+        else
+            warn_fail "pip install pynvim failed"
+        fi
     fi
 else
-    warn_fail "pipx not found; skipping Python provider (pynvim)"
+    warn_fail "python3 not found; skipping Python provider (pynvim)"
 fi
 
 # ---- Summary ----

@@ -1,5 +1,12 @@
 require "nvchad.options"
 
+-- Language providers: LazyChad uses the Python and Node providers only.
+-- Disable Ruby/Perl so `:checkhealth` stays green instead of warning about
+-- toolchains we don't ship. (Node: `npm i -g neovim`; Python: pynvim via pip —
+-- both handled by `lazychad-deps`.)
+vim.g.loaded_ruby_provider = 0
+vim.g.loaded_perl_provider = 0
+
 -- Silence all Neovim deprecation warnings (especially for stylize_markdown in 0.11+)
 vim.g.deprecation_warnings = false
 -- Suppress specific internal deprecation notices
