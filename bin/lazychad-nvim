@@ -1,11 +1,22 @@
 #!/bin/bash
 # LazyChad Neovim Installer
-# Installs/updates/uninstalls the latest stable Neovim using the official
-# GitHub release tarball into /usr/local (shadowing any apt/pacman nvim via
-# PATH). Tarball-first, arch-aware, with native package-manager fallback.
+# Installs/updates/uninstalls Neovim using the official GitHub release tarball
+# into /usr/local (shadowing any apt/pacman nvim via PATH). Tarball-first,
+# arch-aware, with native package-manager fallback.
+#
+# Defaults to the **nightly** channel, because LazyChad needs Neovim 0.12+
+# (required by nvim-treesitter) and the current stable line is still 0.11.
+# Use --stable to install the latest stable release instead.
 # Run as a normal user; escalates with sudo per-command.
 
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
+
+# Channel: "nightly" (default) or "stable". Overridden by main() flags.
+NVIM_CHANNEL="${NVIM_CHANNEL:-nightly}"
+
+# Minimum Neovim LazyChad requires (nvim-treesitter needs 0.12+).
+MIN_NVIM_MAJOR=0
+MIN_NVIM_MINOR=12
 
 # ---- pure helpers (sourceable for tests) ----
 
@@ -22,9 +33,43 @@ nvim_download_url() {
     echo "https://github.com/neovim/neovim/releases/download/v$2/$1.tar.gz"
 }
 
+nvim_nightly_url() {
+    # $1=asset base
+    echo "https://github.com/neovim/neovim/releases/download/nightly/$1.tar.gz"
+}
+
 get_installed_version() {
     command -v nvim >/dev/null 2>&1 || { echo "none"; return; }
     nvim --version 2>/dev/null | head -1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' || echo "none"
+}
+
+get_installed_build() {
+    # Full first line of `nvim --version` (incl. nightly -dev+g<hash>), or "none".
+    command -v nvim >/dev/null 2>&1 || { echo "none"; return; }
+    nvim --version 2>/dev/null | head -1 || echo "none"
+}
+
+version_ge_min() {
+    # $1 = version "X.Y.Z" (or "none"). Returns 0 if >= MIN_NVIM_MAJOR.MINOR.
+    local v="$1" major minor
+    if [ -z "$v" ] || [ "$v" = "none" ]; then
+        return 1
+    fi
+    major="${v%%.*}"
+    minor="${v#*.}"; minor="${minor%%.*}"
+    case "$major$minor" in *[!0-9]*) return 1 ;; esac
+    if [ "$major" -gt "$MIN_NVIM_MAJOR" ]; then
+        return 0
+    fi
+    if [ "$major" -eq "$MIN_NVIM_MAJOR" ] && [ "$minor" -ge "$MIN_NVIM_MINOR" ]; then
+        return 0
+    fi
+    return 1
+}
+
+nightly_hash_of() {
+    # Extract the commit short-hash from a version line ($1); empty if none.
+    printf '%s' "$1" | grep -oiP '\+g\K[0-9a-f]{7,}' || true
 }
 
 get_latest_version() {
@@ -32,13 +77,11 @@ get_latest_version() {
         | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo ""
 }
 
-detect_os() {
-    if [ -f /etc/os-release ]; then
-        # shellcheck disable=SC1091
-        . /etc/os-release; echo "${ID:-unknown}"
-    else
-        echo "unknown"
-    fi
+get_latest_nightly_hash() {
+    # The nightly release body carries the exact build string, e.g.
+    # "NVIM v0.13.0-dev-752+gb8e3f3f4e0" -> we extract the g<hash>.
+    curl -fsSL https://api.github.com/repos/neovim/neovim/releases/tags/nightly 2>/dev/null \
+        | grep -oiP 'NVIM v[0-9.]+-dev-[0-9]+\+g\K[0-9a-f]{7,}' | head -1 || echo ""
 }
 
 # ---- actions ----
@@ -63,28 +106,54 @@ note_apt_neovim() {
 }
 
 manual_help() {
-    echo -e "${RED}❌ Could not install Neovim automatically.${NC}"
-    echo "Install the latest manually from:"
-    echo "  https://github.com/neovim/neovim/releases/latest"
+    echo -e "${RED}❌ Could not install a Neovim new enough for LazyChad (need ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+).${NC}"
+    echo "Install it manually from:"
+    echo "  https://github.com/neovim/neovim/releases"
 }
 
 native_install_neovim() {
-    local os; os="$(detect_os)"
-    echo -e "${BLUE}Falling back to native package manager for $os...${NC}"
-    case "$os" in
-        arch|cachyos|manjaro) sudo pacman -S --needed --noconfirm neovim ;;
-        fedora)               sudo dnf install -y neovim ;;
-        debian|ubuntu|pop|kali) sudo apt-get update && sudo apt-get install -y neovim ;;
-        *)                    return 1 ;;
-    esac
+    # Distro-agnostic: pick the package manager by which binary exists, so
+    # derivatives (Mint, EndeavourOS, Rocky, openSUSE, ...) work too.
+    echo -e "${BLUE}Falling back to the system package manager...${NC}"
+    echo -e "${YELLOW}Note: distro packages are often older than 0.12 (what LazyChad needs).${NC}"
+    if   command -v pacman  >/dev/null 2>&1; then sudo pacman -S --needed --noconfirm neovim
+    elif command -v dnf     >/dev/null 2>&1; then sudo dnf install -y neovim
+    elif command -v zypper  >/dev/null 2>&1; then sudo zypper install -y neovim
+    elif command -v apt-get >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y neovim
+    elif command -v apk     >/dev/null 2>&1; then sudo apk add neovim
+    elif command -v xbps-install >/dev/null 2>&1; then sudo xbps-install -y neovim
+    else
+        echo -e "${RED}No supported package manager found.${NC}"
+        return 1
+    fi
+}
+
+verify_min() {
+    # Print the installed version line; succeed only if it's >= the minimum.
+    local v; v="$(get_installed_version)"
+    nvim --version 2>/dev/null | head -1 || true
+    if version_ge_min "$v"; then
+        return 0
+    fi
+    echo -e "${RED}⚠️ Installed Neovim is v${v}, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}"
+    return 1
+}
+
+native_fallback() {
+    # Last resort: native package manager, then enforce the minimum version.
+    # Succeeds ONLY if it actually yields Neovim >= the minimum.
+    if native_install_neovim && verify_min; then
+        return 0
+    fi
+    manual_help
+    return 1
 }
 
 install_tarball() {
-    # $1=asset  $2=version
-    local asset="$1" version="$2" url tmp
-    url="$(nvim_download_url "$asset" "$version")"
+    # $1=asset  $2=url  $3=label
+    local asset="$1" url="$2" label="$3" tmp
     tmp="$(mktemp -d)"
-    echo -e "${BLUE}Downloading Neovim v$version ($asset)...${NC}"
+    echo -e "${BLUE}Downloading Neovim ${label} ($asset)...${NC}"
     if ! curl -fSL "$url" -o "$tmp/$asset.tar.gz"; then rm -rf "$tmp"; return 1; fi
     echo -e "${BLUE}Extracting to /usr/local...${NC}"
     if ! sudo tar -xzf "$tmp/$asset.tar.gz" -C /usr/local --strip-components=1; then rm -rf "$tmp"; return 1; fi
@@ -92,39 +161,80 @@ install_tarball() {
     return 0
 }
 
-install_or_update() {
-    local current latest asset
-    echo -e "${BOLD}=== LazyChad Neovim Installer ===${NC}"
+install_stable() {
+    local asset="$1" current latest
     current="$(get_installed_version)"
-    asset="$(detect_arch)"
-
-    if [ "$asset" = "unsupported" ]; then
-        echo -e "${YELLOW}Unsupported CPU arch ($(uname -m)).${NC}"
-        if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
-    fi
-
     latest="$(get_latest_version || true)"
     if [ -z "${latest:-}" ]; then
-        echo -e "${YELLOW}Could not determine the latest version (network?).${NC}"
-        if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
+        echo -e "${YELLOW}Could not determine the latest stable version (network?).${NC}"
+        native_fallback; return $?
     fi
 
-    echo -e "Installed: ${current}    Latest: ${latest}"
+    echo -e "Installed: ${current}    Latest stable: ${latest}"
     if [ "$current" = "$latest" ]; then
-        echo -e "${GREEN}✅ Already on the latest Neovim (v$latest).${NC}"
+        echo -e "${GREEN}✅ Already on the latest stable Neovim (v$latest).${NC}"
         return 0
     fi
 
     cleanup_manual
     note_apt_neovim
-    if install_tarball "$asset" "$latest"; then
+    if install_tarball "$asset" "$(nvim_download_url "$asset" "$latest")" "v$latest"; then
         echo -e "${GREEN}✅ Neovim v$latest installed to /usr/local.${NC}"
         nvim --version | head -1
+        if ! version_ge_min "$latest"; then
+            echo -e "${YELLOW}Heads up: v$latest is below ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}, which LazyChad needs.${NC}"
+            echo -e "${YELLOW}Run 'lazychad-nvim' (without --stable) to get a compatible nightly.${NC}"
+        fi
         return 0
     fi
 
     echo -e "${RED}⚠️ Tarball install failed. Trying native package manager...${NC}"
-    if native_install_neovim; then nvim --version | head -1; return 0; else manual_help; return 1; fi
+    native_fallback
+}
+
+install_nightly() {
+    local asset="$1" current_line current_hash latest_hash
+    current_line="$(get_installed_build)"
+    current_hash="$(nightly_hash_of "$current_line")"
+    latest_hash="$(get_latest_nightly_hash || true)"
+
+    echo -e "Installed: ${current_line}"
+    if [ -n "$latest_hash" ]; then
+        echo -e "Latest nightly: ...+g${latest_hash}"
+        if [ -n "$current_hash" ] && [ "$current_hash" = "$latest_hash" ]; then
+            echo -e "${GREEN}✅ Already on the latest Neovim nightly (g${latest_hash}).${NC}"
+            return 0
+        fi
+    else
+        echo -e "${YELLOW}Could not determine the latest nightly build; reinstalling.${NC}"
+    fi
+
+    cleanup_manual
+    note_apt_neovim
+    if install_tarball "$asset" "$(nvim_nightly_url "$asset")" "nightly" && verify_min; then
+        echo -e "${GREEN}✅ Neovim nightly installed to /usr/local.${NC}"
+        return 0
+    fi
+
+    echo -e "${RED}⚠️ Nightly tarball install failed or too old. Trying native package manager...${NC}"
+    native_fallback
+}
+
+install_or_update() {
+    local asset
+    echo -e "${BOLD}=== LazyChad Neovim Installer (${NVIM_CHANNEL}) ===${NC}"
+    asset="$(detect_arch)"
+
+    if [ "$asset" = "unsupported" ]; then
+        echo -e "${YELLOW}Unsupported CPU arch ($(uname -m)); no prebuilt tarball.${NC}"
+        native_fallback; return $?
+    fi
+
+    if [ "$NVIM_CHANNEL" = "stable" ]; then
+        install_stable "$asset"
+    else
+        install_nightly "$asset"
+    fi
 }
 
 uninstall_nvim() {
@@ -138,12 +248,46 @@ uninstall_nvim() {
     echo -e "${YELLOW}Any apt/pacman 'neovim' package was left untouched.${NC}"
 }
 
+usage() {
+    cat <<'EOF'
+LazyChad Neovim Installer
+
+Usage: lazychad-nvim [action] [--stable|--nightly]
+
+Actions:
+  (none), install, --install, -i   Install or update Neovim (default)
+  update, --update, -u             Same as install
+  --uninstall, -r                  Remove the /usr/local Neovim install
+  --cleanup, -c                    Remove leftover manual-install files
+  --help, -h                       Show this help
+
+Channels:
+  --nightly   Install the nightly build (DEFAULT — needed for 0.12+)
+  --stable    Install the latest stable release (currently 0.11.x)
+EOF
+}
+
 main() {
-    case "${1:-install}" in
-        -r|--uninstall)                   uninstall_nvim ;;
-        -c|--cleanup)                     cleanup_manual; echo -e "${GREEN}Manual-install cleanup done.${NC}" ;;
-        -i|--install|-u|--update|install|update) install_or_update ;;
-        *)                                install_or_update ;;
+    NVIM_CHANNEL="nightly"
+    local action="install"
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --stable)                                 NVIM_CHANNEL="stable" ;;
+            --nightly)                                NVIM_CHANNEL="nightly" ;;
+            -r|--uninstall)                           action="uninstall" ;;
+            -c|--cleanup)                             action="cleanup" ;;
+            -h|--help)                                action="help" ;;
+            -i|--install|-u|--update|install|update)  action="install" ;;
+            *)                                        action="install" ;;
+        esac
+        shift
+    done
+
+    case "$action" in
+        uninstall) uninstall_nvim ;;
+        cleanup)   cleanup_manual; echo -e "${GREEN}Manual-install cleanup done.${NC}" ;;
+        help)      usage ;;
+        install)   install_or_update ;;
     esac
 }
 

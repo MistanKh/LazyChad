@@ -46,6 +46,23 @@ else
     fi
 fi
 
+# Ensure a usable Neovim is present before launching.
+if ! command -v nvim >/dev/null 2>&1; then
+    echo -e "\033[0;31m❌ Neovim is not installed (or not on your PATH).\033[0m"
+    echo "Run 'lazychad-deps' to install Neovim 0.12+ and the providers,"
+    echo "or 'lazychad-nvim' to install just Neovim."
+    exit 1
+fi
+
+# Warn (don't block) if Neovim is older than the 0.12 LazyChad needs.
+NVIM_VER="$(nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+' | head -1)"
+if [ -n "$NVIM_VER" ]; then
+    NVIM_MAJ="${NVIM_VER%%.*}"; NVIM_MIN="${NVIM_VER#*.}"
+    if [ "$NVIM_MAJ" -eq 0 ] && [ "$NVIM_MIN" -lt 12 ]; then
+        echo -e "\033[0;33m⚠️  Neovim $NVIM_VER detected, but LazyChad needs 0.12+.\033[0m"
+        echo -e "\033[0;33m    Run 'lazychad-nvim' (installs nightly) to upgrade. Continuing anyway...\033[0m"
+    fi
+fi
+
 # Run Neovim and pass all arguments ($@)
-export NVIM_APPNAME="LazyChad"
 exec nvim "$@"

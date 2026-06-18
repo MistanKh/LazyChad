@@ -13,12 +13,12 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 - **🧠 Intelligent Neural Mappings**: A dynamic toolchain system that live-scans the Mason registry to recommend LSPs, formatters, and linters for every filetype.
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
 - **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated failed tool-install attempts during toolchain setup.
-- **🛡️ Cross-Distro Intelligence**: Bundles `lazychad-nvim`, which installs the latest stable Neovim from the official GitHub release tarball on any distro (x86_64 / arm64) — no PPAs, COPRs, or AppImages to break, and no fight with an outdated repo package.
+- **🛡️ Cross-Distro Intelligence**: Bundles `lazychad-nvim`, which installs Neovim (nightly by default, since LazyChad needs 0.12+) from the official GitHub release tarball on any distro (x86_64 / arm64) — no PPAs, COPRs, or AppImages to break, and no fight with an outdated repo package.
 - **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
 - **🖼️ Neovide Optimized**: Pre-configured for the **Neovide** GUI with smooth 120Hz animations, "pixiedust" cursor effects, and perfect typography.
 - **🔡 Typography Ready**: Out-of-the-box support for **JetBrainsMono Nerd Font** for perfect icons and coding clarity.
-- **🚀 Future-Proof**: Targets the latest stable Neovim (0.12+, as required by `nvim-treesitter`) and the new `vim.lsp.config` API.
+- **🚀 Future-Proof**: Targets Neovim 0.12+ (as required by `nvim-treesitter`, currently only on the nightly channel) and the new `vim.lsp.config` API.
 
 ---
 
@@ -27,9 +27,10 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 > [!IMPORTANT]
 > **Whatever method you use, you must run `lazychad-deps` afterward.** Installing
 > the package alone does **not** give you a recent Neovim — `lazychad-deps`
-> installs the latest stable Neovim (0.12+, required by `nvim-treesitter`) via the
-> bundled `lazychad-nvim` script, plus the Node/Python/Rust providers. Without it
-> you'll be left on your distro's (often outdated) Neovim.
+> installs Neovim **nightly** (0.12+, required by `nvim-treesitter`; the current
+> stable line is still 0.11) via the bundled `lazychad-nvim` script, plus the
+> Node/Python/Rust providers. Without it you'll be left on your distro's (often
+> outdated) Neovim.
 
 ### Option 1: Arch Linux (AUR)
 If you are on Arch Linux or CachyOS, you can install LazyChad directly from the AUR. 
@@ -47,18 +48,18 @@ paru -S lazychad
 ### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.0.4-1_all.deb
+sudo apt install ./lazychad_1.0.5-1_all.deb
 lazychad-deps   # required: installs the latest Neovim + providers
 ```
-*Note: `neovim` is a **recommended** (not required) dependency, so apt may pull in your distro's older Neovim — that's harmless. `lazychad-deps` then installs the latest stable Neovim to `/usr/local`, which shadows it via `PATH`. Keeping `neovim` a recommend (not a hard depend) is also what stops a system `neovim` removal from cascade-removing LazyChad.*
+*Note: `neovim` is a **recommended** (not required) dependency, so apt may pull in your distro's older Neovim — that's harmless. `lazychad-deps` then installs Neovim nightly to `/usr/local`, which shadows it via `PATH`. Keeping `neovim` a recommend (not a hard depend) is also what stops a system `neovim` removal from cascade-removing LazyChad.*
 
 ### Option 3: Fedora / RHEL (.rpm)
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo dnf install ./lazychad-1.0.4-1.noarch.rpm
+sudo dnf install ./lazychad-1.0.5-1.noarch.rpm
 lazychad-deps   # required: installs the latest Neovim + providers
 ```
-*Note: `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
+*Note: `lazychad-deps` installs Neovim nightly via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
 
 ### Option 4: Manual Installation (All Linux/macOS)
 If you prefer to install manually, follow these steps:
@@ -84,10 +85,15 @@ fish_add_path ~/.config/LazyChad/bin
 ```
 
 #### 3. Install Dependencies
-Run the built-in dependency script to install the latest Neovim (0.12+) and set up the Node, Python, and Rust providers:
+Run the built-in dependency script to install Neovim (nightly, 0.12+) and set up the Node, Python, and Rust providers:
 ```bash
 lazychad-deps
 ```
+`lazychad-deps` is **best-effort**: it auto-detects your distro family (including
+derivatives like Mint, Pop!_OS, EndeavourOS, Rocky), keeps going if one optional
+step fails, prints a summary of anything that needs attention at the end, and
+auto-links `fdfind` → `fd` on Debian/Fedora. Just re-run it after fixing any
+reported issue.
 
 ---
 
@@ -115,17 +121,23 @@ lazychad-deps
 
 ## 🛠️ Managing Neovim
 
-LazyChad bundles `lazychad-nvim`, which installs the latest **stable** Neovim
-from the official GitHub release tarball into `/usr/local` (so it shadows any
-distro `neovim` package via `PATH`). It detects your CPU (x86_64 / arm64) and
-falls back to your distro package manager if the download is unavailable.
+LazyChad bundles `lazychad-nvim`, which installs Neovim from the official
+GitHub release tarball into `/usr/local` (so it shadows any distro `neovim`
+package via `PATH`). It defaults to the **nightly** channel because LazyChad
+needs 0.12+ (required by `nvim-treesitter`) and the current stable line is
+still 0.11. It detects your CPU (x86_64 / arm64) and, if the download is
+unavailable, falls back to your system package manager — picking it by which
+binary exists (`pacman`/`dnf`/`zypper`/`apt-get`/`apk`/`xbps`), so derivatives
+(Mint, EndeavourOS, Rocky, openSUSE, …) work too. Either way it **verifies the
+result is 0.12+** and refuses to report success on anything older.
 
 ```bash
-lazychad-nvim            # install or update to the latest Neovim
+lazychad-nvim              # install/update Neovim nightly (default — what LazyChad needs)
+lazychad-nvim --stable     # install the latest stable release instead (0.11.x)
 lazychad-nvim --uninstall  # remove the /usr/local Neovim install
 ```
 
-`lazychad-deps` runs this automatically as its Neovim step.
+`lazychad-deps` runs this automatically as its Neovim step (nightly).
 
 ## 🗑️ Uninstalling
 

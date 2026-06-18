@@ -1,8 +1,10 @@
 #!/bin/bash
 # LazyChad Universal Dependency Installer
-# Supports: Arch Linux, Debian/Ubuntu, Fedora
-
-set -e
+# Supports: Arch / Debian / Fedora families (incl. derivatives via ID_LIKE).
+#
+# Best-effort by design: a single failing optional step (e.g. a Neovide build)
+# does NOT abort the whole setup. Failures are collected and reported at the end
+# so you always know exactly what to fix, instead of dying halfway through.
 
 BOLD="\033[1m"
 GREEN="\033[0;32m"
@@ -10,6 +12,10 @@ BLUE="\033[0;34m"
 YELLOW="\033[0;33m"
 RED="\033[0;31m"
 NC="\033[0m" # No Color
+
+# Collect non-fatal failures so we can summarize at the end.
+FAILED_STEPS=()
+warn_fail() { echo -e "${RED}⚠️  $1${NC}"; FAILED_STEPS+=("$1"); }
 
 echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
 echo -e "This script will detect your OS and install required external tools.\n"
@@ -26,6 +32,7 @@ exists() {
 }
 
 # Detect OS
+ID_LIKE=""
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS="$ID"
@@ -36,10 +43,27 @@ fi
 # Set a fallback for NAME if it's missing from os-release
 NAME="${NAME:-$OS}"
 
-echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS)${NC}"
+# Normalize derivatives onto a base family (arch/debian/fedora) so distros like
+# Mint, EndeavourOS, Rocky, Pop!_OS, etc. get the right package list. We try the
+# known IDs first, then fall back to ID_LIKE.
+case "$OS" in
+    arch|cachyos|manjaro|endeavouros|garuda|arcolinux|artix) FAMILY="arch" ;;
+    debian|ubuntu|pop|kali|linuxmint|elementary|zorin|raspbian|devuan|mx|parrot) FAMILY="debian" ;;
+    fedora|rhel|centos|rocky|almalinux|ol|nobara) FAMILY="fedora" ;;
+    *)
+        case " $ID_LIKE " in
+            *arch*)              FAMILY="arch" ;;
+            *debian*|*ubuntu*)   FAMILY="debian" ;;
+            *fedora*|*rhel*|*centos*) FAMILY="fedora" ;;
+            *)                   FAMILY="$OS" ;;
+        esac
+        ;;
+esac
 
-# 1. Neovim (delegated to lazychad-nvim)
-echo -e "\n${BOLD}${YELLOW}[1/6] Ensuring latest Neovim...${NC}"
+echo -e "${BOLD}${YELLOW}Detected OS: $NAME ($OS, family: $FAMILY)${NC}"
+
+# 1. Neovim (delegated to lazychad-nvim — installs nightly, since LazyChad needs 0.12+)
+echo -e "\n${BOLD}${YELLOW}[1/6] Ensuring latest Neovim (nightly)...${NC}"
 
 NVIM_INSTALLER=""
 if command -v lazychad-nvim >/dev/null 2>&1; then
@@ -58,8 +82,8 @@ fi
 # 2. System Packages
 echo -e "\n${BOLD}${YELLOW}[2/6] Checking System Packages...${NC}"
 
-case $OS in
-    arch|cachyos|manjaro)
+case $FAMILY in
+    arch)
         PKG_MANAGER="sudo pacman -S --needed --noconfirm"
         DEPS=(
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake"
@@ -71,9 +95,9 @@ case $OS in
         )
         check_installed() { pacman -Qs "^$1$" >/dev/null 2>&1; }
         ;;
-    debian|ubuntu|pop|kali)
+    debian)
         PKG_MANAGER="sudo apt-get install -y"
-        sudo apt-get update
+        sudo apt-get update || warn_fail "apt-get update failed (network?); package install may be incomplete"
         DEPS=(
             "nodejs" "npm" "git" "make" "unzip" "gcc" "cmake" "curl" "gnupg" "ca-certificates"
             "gcc-multilib" "g++-multilib" "libssl-dev" "pkg-config" "libfreetype6-dev"
@@ -92,11 +116,12 @@ case $OS in
             "jetbrains-mono-fonts" "python3" "python3-pip" "pipx"
             "ripgrep" "fd-find" "lua5.1" "luarocks" "wl-clipboard" "xclip"
         )
-        sudo dnf install -y gcc gcc-c++ make cmake automake autoconf binutils
+        sudo dnf install -y gcc gcc-c++ make cmake automake autoconf binutils \
+            || warn_fail "Some Fedora build tools failed to install"
         check_installed() { rpm -q "$1" >/dev/null 2>&1; }
         ;;
     *)
-        echo -e "${RED}Unsupported OS: $OS. Please install dependencies manually.${NC}"
+        echo -e "${RED}Unsupported OS: $OS (family: $FAMILY). Please install dependencies manually.${NC}"
         exit 1
         ;;
 esac
@@ -110,18 +135,37 @@ done
 
 if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
     echo -e "${BLUE}Installing missing system packages via $OS package manager...${NC}"
-    $PKG_MANAGER "${MISSING_DEPS[@]}"
+    $PKG_MANAGER "${MISSING_DEPS[@]}" \
+        || warn_fail "Some system packages failed to install: ${MISSING_DEPS[*]}"
 else
     echo -e "${GREEN}✅ All system packages are already installed.${NC}"
+fi
+
+# On Debian/Fedora the package is 'fd-find' and ships the binary as 'fdfind';
+# Telescope/NvChad expect 'fd'. Bridge it with a user-local symlink.
+if [ "$FAMILY" != "arch" ] && ! exists fd && exists fdfind; then
+    mkdir -p "$HOME/.local/bin"
+    if ln -sf "$(command -v fdfind)" "$HOME/.local/bin/fd"; then
+        echo -e "${GREEN}🔗 Linked fdfind -> ~/.local/bin/fd${NC}"
+        case ":$PATH:" in
+            *":$HOME/.local/bin:"*) ;;
+            *) echo -e "${YELLOW}   Add ~/.local/bin to your PATH so 'fd' is found.${NC}" ;;
+        esac
+    else
+        warn_fail "Could not link fdfind -> fd"
+    fi
 fi
 
 # 3. Rust Toolchain
 echo -e "\n${BOLD}${YELLOW}[3/6] Checking Rust Toolchain (rustup)...${NC}"
 if ! exists cargo; then
     echo -e "${BLUE}Installing Rust via rustup...${NC}"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-    # shellcheck source=/dev/null
-    [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+    if curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; then
+        # shellcheck source=/dev/null
+        [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
+    else
+        warn_fail "Rust/rustup install failed (Neovide build will be skipped)"
+    fi
 else
     echo -e "${GREEN}✅ Rust/Cargo is already installed.${NC}"
 fi
@@ -129,12 +173,14 @@ fi
 # 4. Neovide (Build from source for Debian/Fedora)
 echo -e "\n${BOLD}${YELLOW}[4/6] Checking Neovide GUI...${NC}"
 if ! exists neovide; then
-    if [[ "$OS" == "arch" || "$OS" == "cachyos" || "$OS" == "manjaro" ]]; then
+    if [[ "$FAMILY" == "arch" ]]; then
         echo -e "${BLUE}Installing Neovide via pacman...${NC}"
-        sudo pacman -S --needed --noconfirm neovide
-    else
+        sudo pacman -S --needed --noconfirm neovide || warn_fail "Neovide install via pacman failed"
+    elif exists cargo; then
         echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
-        cargo install --git https://github.com/neovide/neovide
+        cargo install --git https://github.com/neovide/neovide || warn_fail "Neovide build from source failed"
+    else
+        warn_fail "Skipping Neovide: cargo is not available"
     fi
 else
     echo -e "${GREEN}✅ Neovide is already installed.${NC}"
@@ -142,28 +188,49 @@ fi
 
 # 5. Global NPM Packages
 echo -e "\n${BOLD}${YELLOW}[5/6] Checking Node.js Providers...${NC}"
-if ! npm list -g neovim >/dev/null 2>&1; then
-    echo -e "${BLUE}Installing global npm package: neovim${NC}"
-    sudo npm i -g neovim
-else
-    echo -e "${GREEN}✅ Global npm 'neovim' is already installed.${NC}"
-fi
+if exists npm; then
+    if ! npm list -g neovim >/dev/null 2>&1; then
+        echo -e "${BLUE}Installing global npm package: neovim${NC}"
+        sudo npm i -g neovim || warn_fail "npm global 'neovim' install failed"
+    else
+        echo -e "${GREEN}✅ Global npm 'neovim' is already installed.${NC}"
+    fi
 
-if ! exists tree-sitter; then
-    echo -e "${BLUE}Installing global npm package: tree-sitter-cli${NC}"
-    sudo npm i -g tree-sitter-cli
+    if ! exists tree-sitter; then
+        echo -e "${BLUE}Installing global npm package: tree-sitter-cli${NC}"
+        sudo npm i -g tree-sitter-cli || warn_fail "npm global 'tree-sitter-cli' install failed"
+    else
+        echo -e "${GREEN}✅ Global npm 'tree-sitter-cli' is already installed.${NC}"
+    fi
 else
-    echo -e "${GREEN}✅ Global npm 'tree-sitter-cli' is already installed.${NC}"
+    warn_fail "npm not found; skipping Node.js providers (neovim, tree-sitter-cli)"
 fi
 
 # 6. Python Provider (pynvim)
 echo -e "\n${BOLD}${YELLOW}[6/6] Checking Python Providers (pynvim)...${NC}"
-if ! pipx list | grep -q "pynvim"; then
-    echo -e "${BLUE}Installing pynvim via pipx...${NC}"
-    pipx install pynvim --force
+if exists pipx; then
+    if ! pipx list 2>/dev/null | grep -q "pynvim"; then
+        echo -e "${BLUE}Installing pynvim via pipx...${NC}"
+        pipx install pynvim --force || warn_fail "pipx install pynvim failed"
+    else
+        echo -e "${GREEN}✅ Python provider (pynvim) is already installed.${NC}"
+    fi
 else
-    echo -e "${GREEN}✅ Python provider (pynvim) is already installed.${NC}"
+    warn_fail "pipx not found; skipping Python provider (pynvim)"
 fi
 
-echo -e "\n${BOLD}${GREEN}✨ Installation Complete!${NC}"
-echo -e "Please restart your terminal and run ${BOLD}:checkhealth${NC} inside LazyChad to verify everything is working perfectly.\n"
+# ---- Summary ----
+echo ""
+if [ ${#FAILED_STEPS[@]} -eq 0 ]; then
+    echo -e "${BOLD}${GREEN}✨ Installation Complete!${NC}"
+else
+    echo -e "${BOLD}${YELLOW}⚠️  Installation finished with ${#FAILED_STEPS[@]} issue(s):${NC}"
+    for f in "${FAILED_STEPS[@]}"; do
+        echo -e "   ${RED}•${NC} $f"
+    done
+    echo -e "${YELLOW}LazyChad may still work; re-run 'lazychad-deps' after fixing the above.${NC}"
+fi
+echo -e "Restart your terminal, then run ${BOLD}:checkhealth${NC} inside LazyChad to verify.\n"
+
+# Non-zero exit if anything failed, so callers/CI can detect it.
+[ ${#FAILED_STEPS[@]} -eq 0 ]

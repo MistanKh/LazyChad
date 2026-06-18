@@ -23,6 +23,25 @@ assert_eq "$(nvim_download_url nvim-linux-x86_64 0.12.0)" \
   "https://github.com/neovim/neovim/releases/download/v0.12.0/nvim-linux-x86_64.tar.gz" \
   "nvim_download_url has v prefix"
 
+# nightly URL uses the 'nightly' tag (no version)
+assert_eq "$(nvim_nightly_url nvim-linux-x86_64)" \
+  "https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.tar.gz" \
+  "nvim_nightly_url uses nightly tag"
+
+# nightly_hash_of extracts the g<hash> from a -dev version line
+assert_eq "$(nightly_hash_of 'NVIM v0.13.0-dev-752+gb8e3f3f4e0')" "b8e3f3f4e0" \
+  "nightly_hash_of extracts commit hash"
+assert_eq "$(nightly_hash_of 'NVIM v0.11.4')" "" \
+  "nightly_hash_of empty for stable version"
+
+# version_ge_min: LazyChad needs 0.12+
+assert_eq "$(version_ge_min 0.12.0 && echo yes || echo no)" "yes" "version_ge_min 0.12.0 ok"
+assert_eq "$(version_ge_min 0.13.0 && echo yes || echo no)" "yes" "version_ge_min 0.13.0 ok"
+assert_eq "$(version_ge_min 1.0.0  && echo yes || echo no)" "yes" "version_ge_min 1.0.0 ok"
+assert_eq "$(version_ge_min 0.11.4 && echo yes || echo no)" "no"  "version_ge_min 0.11.4 too old"
+assert_eq "$(version_ge_min 0.9.5  && echo yes || echo no)" "no"  "version_ge_min 0.9.5 too old"
+assert_eq "$(version_ge_min none   && echo yes || echo no)" "no"  "version_ge_min none too old"
+
 # cleanup_manual must succeed even when nothing exists (sudo/rm stubbed)
 sudo() { "$@"; }            # drop the privilege escalation in tests
 rm() { :; }                 # no-op rm so the test never deletes anything
