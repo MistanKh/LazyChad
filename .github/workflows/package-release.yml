@@ -33,10 +33,16 @@ jobs:
       - name: Generate checksums
         run: sha256sum *.deb *.rpm > SHA256SUMS && cat SHA256SUMS
 
+      - name: Release notes
+        run: |
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [ -f "$notes" ]; then cp "$notes" release-notes.md; else : > release-notes.md; fi
+
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
+          body_path: release-notes.md
           files: |
             *.deb
             *.rpm

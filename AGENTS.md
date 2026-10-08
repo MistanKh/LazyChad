@@ -22,6 +22,7 @@ and uninstall.
 - Package/release files to keep in sync:
   `.version`, `PKGBUILD`, `nfpm.yaml`, `README.md`, and the AUR `.SRCINFO`.
 - Release flow: bump the version files, merge to `main`, push tag `vX.Y.Z`.
+  Add release notes as `docs/releases/vX.Y.Z.md` (used as the release body).
   The tag builds the `.deb`/`.rpm` + `SHA256SUMS` release and syncs the AUR
   (`updpkgsums` pins the tarball checksum). `install.sh` installs that release.
 

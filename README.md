@@ -76,7 +76,7 @@ Then run `lazychad-deps`.
 ### Option 2: Debian / Ubuntu / Kali (.deb)
 Download the latest `.deb` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo apt install ./lazychad_1.0.9-1_all.deb
+sudo apt install ./lazychad_1.0.10-1_all.deb
 lazychad-deps   # required: installs Neovim 0.12+, tools and plugins
 ```
 *Note: `neovim` is a **recommended** (not required) dependency, so apt may pull in your distro's older Neovim — that's harmless. `lazychad-deps` then installs the latest stable Neovim to `/usr/local`, which shadows it via `PATH`. Keeping `neovim` a recommend (not a hard depend) is also what stops a system `neovim` removal from cascade-removing LazyChad.*
@@ -93,7 +93,7 @@ sudo dnf install -y epel-release && sudo dnf config-manager --set-enabled crb   
 
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
-sudo dnf install ./lazychad-1.0.9-1.noarch.rpm
+sudo dnf install ./lazychad-1.0.10-1.noarch.rpm
 lazychad-deps   # required: installs Neovim 0.12+, tools and plugins
 ```
 *Note: `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
