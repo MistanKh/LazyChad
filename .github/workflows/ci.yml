@@ -140,6 +140,8 @@ jobs:
           nvim --version | head -1
           nvim --version | head -1 | grep -qv -- '-dev'
           fc-list | grep -i "JetBrainsMono Nerd Font"
+          # The download must have been verified, not skipped.
+          grep -F "Checksum verified." ~/.local/state/LazyChad/lazychad-deps.log
 
       - name: Doctor
         run: lchad --doctor
