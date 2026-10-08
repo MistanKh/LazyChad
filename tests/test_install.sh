@@ -73,6 +73,44 @@ assert_eq "$(grep -c '^sudo apt-get install -y .*lazychad_1.0.9-1_all.deb' "$log
 assert_eq "$(grep -c '^deps --gui' "$log")" "1" "main passes flags to lazychad-deps"
 command rm -f "$osr" "$log"
 
+# EPEL: only Enterprise Linux needs it; Oracle's repo id is olN_developer_EPEL
+el_osr="$(mktemp)"
+is_el_for() { printf '%s\n' "ID=$1" "PLATFORM_ID=\"$2\"" > "$el_osr"; (export OS_RELEASE_FILE="$el_osr"; rpm() { return 1; }; is_el && echo el || echo not-el); }
+assert_eq "$(is_el_for rocky platform:el9)"      "el"     "Rocky is Enterprise Linux"
+assert_eq "$(is_el_for ol platform:el9)"         "el"     "Oracle is Enterprise Linux"
+assert_eq "$(is_el_for nobara platform:f40)"     "not-el" "Nobara is not Enterprise Linux"
+assert_eq "$(is_el_for fedora-asahi-remix platform:f41)" "not-el" "Fedora Asahi Remix is not Enterprise Linux"
+command rm -f "$el_osr"
+epel_with() { local repos=("$@"); (dnf() { printf '%s\n' "repo id    repo name" "${repos[@]}"; }; epel_enabled && echo on || echo off); }
+assert_eq "$(epel_with 'baseos     Rocky BaseOS' 'epel       Extra Packages')" "on"  "EPEL detected on Rocky"
+assert_eq "$(epel_with 'ol9_baseos_latest  OL9' 'ol9_developer_EPEL  OL9 EPEL')" "on"  "EPEL detected on Oracle Linux"
+assert_eq "$(epel_with 'fedora     Fedora 41' 'updates    Fedora 41 Updates')" "off" "no EPEL on Fedora"
+
+# main() on Nobara goes straight to the rpm install (no EPEL gate)
+nob="$(mktemp)"; log2="$(mktemp)"
+printf '%s\n' 'ID=nobara' 'ID_LIKE="rhel centos fedora"' 'PLATFORM_ID="platform:f40"' 'VERSION="40 (KDE Plasma)"' > "$nob"
+(
+  export OS_RELEASE_FILE="$nob"
+  is_root() { return 1; }
+  uname() { echo Linux; }
+  rpm() { return 1; }
+  dnf() { echo "fedora  Fedora"; }
+  sudo() { echo "sudo $*" >> "$log2"; }
+  lazychad-deps() { :; }
+  curl() {
+    local out="" a prev=""
+    for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+    case "$*" in
+      *-w*url_effective*) echo "https://github.com/MistanKh/LazyChad/releases/tag/v1.0.9" ;;
+      *releases/download/*.rpm*) echo pkg > "$out" ;;
+      *) return 22 ;;
+    esac
+  }
+  main
+) >/dev/null 2>&1
+assert_eq "$(grep -c '^sudo dnf install -y .*lazychad-1.0.9-1.noarch.rpm' "$log2")" "1" "Nobara installs the rpm without an EPEL gate"
+command rm -f "$nob" "$log2"
+
 # install.sh and lazychad-deps must map distros the same way
 install_family="$(declare -f detect_family)"
 # shellcheck source=/dev/null

@@ -155,6 +155,23 @@ end
 
 -- Stop a server that is no longer chosen for any filetype (servers such as
 -- ts_ls serve several filetypes, so only disable it when nothing uses it).
+-- Disable a server and stop its clients, including ones still initializing
+-- (vim.lsp.enable(name, false) alone can miss a client that just started).
+local function stop_server(server)
+  pcall(vim.lsp.enable, server, false)
+  for _, filter in ipairs { { name = server }, { name = server, _uninitialized = true } } do
+    local ok, clients = pcall(vim.lsp.get_clients, filter)
+    if ok then
+      for _, client in ipairs(clients) do
+        pcall(function()
+          client:stop(true)
+        end)
+      end
+    end
+  end
+  setup_servers[server] = nil
+end
+
 local function release_server(server, state_tbl)
   if not server or server == none_choice or not (vim.lsp.config and vim.lsp.enable) then
     return
@@ -164,15 +181,19 @@ local function release_server(server, state_tbl)
       return
     end
   end
-  pcall(vim.lsp.enable, server, false)
-  setup_servers[server] = nil
+  stop_server(server)
+end
+
+-- The saved Lua choice (a server name, "__none__", or nil).
+function M.lua_choice()
+  return (load_state().filetypes or {}).lua
 end
 
 -- NvChad's defaults() always enables lua_ls; respect a different Lua choice.
 function M.apply_lua_choice()
-  local choice = (load_state().filetypes or {}).lua
+  local choice = M.lua_choice()
   if choice and choice ~= "lua_ls" and vim.lsp.enable then
-    pcall(vim.lsp.enable, "lua_ls", false)
+    stop_server "lua_ls"
   end
 end
 
@@ -329,7 +350,8 @@ function M.setup()
       -- Also accept a server already on PATH (system package, rustup, ...)
       if not is_installed then
         load_lspconfig()
-        is_installed = server_executable(saved)
+        -- (but not rustup's rust-analyzer proxy without the component)
+        is_installed = server_executable(saved) and utils.tool_runs(saved)
       end
 
       if is_installed then

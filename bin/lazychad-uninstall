@@ -39,11 +39,15 @@ user_dirs() {
         [ -d "$home" ] || continue
         for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
             [ -d "$home/$sub" ] && echo "$home/$sub"
+            # leftover upgrade stashes, or a reinstall would restore them
+            [ -d "$home/$sub.pkg-upgrade" ] && echo "$home/$sub.pkg-upgrade"
         done
     done
     for var in XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
         val="${!var:-}"
-        [ -n "$val" ] && [ -d "$val/LazyChad" ] && echo "$val/LazyChad"
+        [ -n "$val" ] || continue
+        [ -d "$val/LazyChad" ] && echo "$val/LazyChad"
+        [ -d "$val/LazyChad.pkg-upgrade" ] && echo "$val/LazyChad.pkg-upgrade"
     done
     return 0
 }

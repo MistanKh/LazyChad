@@ -63,6 +63,14 @@ version_ge_min() {
     return 1
 }
 
+is_dev_build() {
+    # $1 = first line of `nvim --version`; nightlies are "vX.Y.Z-dev-N+g<hash>".
+    case "$1" in
+        *-dev*) return 0 ;;
+        *)      return 1 ;;
+    esac
+}
+
 nightly_hash_of() {
     # Extract the commit short-hash from a version line ($1); empty if none.
     printf '%s' "$1" | grep -oiP '\+g\K[0-9a-f]{7,}' || true
@@ -194,7 +202,7 @@ install_tarball() {
         rm -rf "$tmp"; return 1
     fi
 
-    # Extract to a staging dir first, so a failure leaves the old install intact.
+    # Test-extract first, so a corrupt archive leaves the old install intact.
     mkdir -p "$tmp/stage"
     if ! tar -xzf "$tmp/$asset.tar.gz" -C "$tmp/stage" --strip-components=1; then rm -rf "$tmp"; return 1; fi
     # Clear the previous tarball's runtime so files from another version
@@ -202,7 +210,12 @@ install_tarball() {
     # is shared with other tools and is left alone.
     sudo rm -rf /usr/local/share/nvim/runtime /usr/local/lib/nvim
     echo -e "${BLUE}Installing to /usr/local...${NC}"
-    if ! sudo cp -a --no-preserve=ownership "$tmp/stage"/. /usr/local/; then rm -rf "$tmp"; return 1; fi
+    # Root tar keeps the archive's modes (ignoring the user's umask), replaces
+    # an existing or dangling /usr/local/bin/nvim symlink instead of writing
+    # through it, and never changes /usr/local's own permissions.
+    if ! sudo tar -xzf "$tmp/$asset.tar.gz" -C /usr/local --strip-components=1 --no-same-owner; then
+        rm -rf "$tmp"; return 1
+    fi
     rm -rf "$tmp"
     return 0
 }
@@ -221,12 +234,12 @@ install_stable() {
         echo -e "${YELLOW}Stable v$latest is older than ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}, which LazyChad needs; using nightly instead.${NC}"
         install_nightly "$asset"; return $?
     fi
-    if [ "$current" = "$latest" ]; then
+    if is_dev_build "$(get_installed_build)"; then
+        # A dev build reports the upcoming X.Y.Z, so compare builds, not versions.
+        echo -e "${YELLOW}Switching from a nightly build to stable v$latest (use --nightly to stay on nightly).${NC}"
+    elif [ "$current" = "$latest" ]; then
         echo -e "${GREEN}✅ Already on the latest stable Neovim (v$latest).${NC}"
         return 0
-    fi
-    if [ -n "$(nightly_hash_of "$(get_installed_build)")" ]; then
-        echo -e "${YELLOW}Switching from a nightly build to stable v$latest (use --nightly to stay on nightly).${NC}"
     fi
 
     cleanup_manual

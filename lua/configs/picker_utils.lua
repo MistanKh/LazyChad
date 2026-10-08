@@ -96,6 +96,12 @@ local function builtin_runs(name)
   return probe_cache[name]
 end
 
+-- false for a known tool whose binary exists but doesn't run (e.g. rustup's
+-- rust-analyzer proxy without the component); true otherwise.
+function M.tool_runs(name)
+  return builtin_runs(name)
+end
+
 function M.get_builtins(ft, category)
   local cat = builtins[category]
   if not cat then

@@ -86,6 +86,18 @@ assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" deadbeef && echo yes
 assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "" && echo yes || echo no)" "no" "verify_sha256 rejects empty hash"
 command rm -rf "$tmpd"
 
+# dev builds are never "already on the latest stable"
+assert_eq "$(is_dev_build 'NVIM v0.13.0-dev-752+gb8e3f3f4e0' && echo yes || echo no)" "yes" "nightly is a dev build"
+assert_eq "$(is_dev_build 'NVIM v0.12.5' && echo yes || echo no)" "no" "stable is not a dev build"
+assert_eq "$(
+  get_installed_version() { echo 0.13.0; }
+  get_installed_build() { echo 'NVIM v0.13.0-dev-752+gb8e3f3f4e0'; }
+  get_latest_version() { echo 0.13.0; }
+  cleanup_manual() { :; }; note_apt_neovim() { :; }
+  install_tarball() { echo INSTALLED; }; verify_min() { :; }
+  install_stable nvim-linux-x86_64 2>/dev/null | grep -c INSTALLED
+)" "1" "a 0.13.0-dev nightly is replaced by stable 0.13.0"
+
 # unknown arguments never fall through to an install
 assert_eq "$( (main bogus) >/dev/null 2>&1; echo $?)" "2" "unknown argument exits 2 instead of installing"
 assert_eq "$(install_or_update() { echo INSTALL; }; uninstall_nvim() { echo UNINSTALL; }; main uninstall 2>/dev/null)" "UNINSTALL" \

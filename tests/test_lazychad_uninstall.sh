@@ -38,6 +38,9 @@ tmpd="$(mktemp -d)"
 mkdir -p "$tmpd/xdg-data/LazyChad"
 assert_eq "$(LAZYCHAD_HOMES=/nonexistent XDG_DATA_HOME="$tmpd/xdg-data" user_dirs)" "$tmpd/xdg-data/LazyChad" \
   "user_dirs includes XDG_DATA_HOME/LazyChad"
+mkdir -p "$tmpd/h/.config/LazyChad.pkg-upgrade"
+assert_eq "$(LAZYCHAD_HOMES="$tmpd/h" XDG_DATA_HOME='' user_dirs)" "$tmpd/h/.config/LazyChad.pkg-upgrade" \
+  "user_dirs includes leftover upgrade stashes"
 command rm -rf "${tmpd:?}"
 
 exit $fail

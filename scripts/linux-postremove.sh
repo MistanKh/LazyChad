@@ -59,7 +59,9 @@ cleanup_user_dirs() {
     echo "==> Cleaning up LazyChad user directories..."
     for user_home in ${LAZYCHAD_HOMES:-/home/* /root}; do
         [ -d "$user_home" ] || continue
-        for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
+        for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad \
+                   .config/LazyChad.pkg-upgrade .local/share/LazyChad.pkg-upgrade \
+                   .local/state/LazyChad.pkg-upgrade .cache/LazyChad.pkg-upgrade; do
             if [ -d "$user_home/$sub" ]; then
                 echo "  -> Removing $user_home/$sub"
                 rm -rf "${user_home:?}/$sub"

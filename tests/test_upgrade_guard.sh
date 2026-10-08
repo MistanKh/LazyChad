@@ -83,6 +83,13 @@ mkdir -p "${tmp:?}/h/alice/.config/LazyChad"
 assert_eq "$([ -f "${tmp:?}/h/alice/.config/LazyChad.pkg-upgrade/mine.lua" ] && echo yes)" "yes" \
     "existing dir wins; old data stays in the stash"
 
+# purge also removes a leftover stash, so a later reinstall can't restore it
+seed
+mkdir -p "${tmp:?}/h/bob/.cache/LazyChad.pkg-upgrade"
+"$SH_BIN" "$S/linux-postremove.sh" purge >/dev/null
+assert_eq "$(stashes)" "0" "purge removes leftover upgrade stashes"
+assert_eq "$(kept)" "0" "purge removes user data"
+
 # the three copies of the restore function must stay identical
 fn() { bash -c "export LAZYCHAD_HOOK_SOURCED=1; source '$1'; declare -f lazychad_restore_user_data"; }
 assert_eq "$(fn "$S/linux-postinstall.sh")" "$(fn "$S/linux-posttrans.sh")" "restore identical in postinstall and posttrans"

@@ -200,12 +200,19 @@ function M.setup()
       return
     end
 
-    if saved and aliases[saved] then
-      -- migrate choices saved under the Mason name (e.g. ruff -> ruff_format)
-      saved = aliases[saved]
-      local current = load_state()
-      current.filetypes[ft] = saved
-      save_state()
+    -- Migrate choices saved under a Mason name conform doesn't know
+    -- (ruff -> ruff_format, sql-formatter -> sql_formatter, ...). A name with
+    -- no conform equivalent is cleared below and the picker asks again.
+    local ok_conform, conform = pcall(require, "conform")
+    if saved and ok_conform then
+      local info = conform.get_formatter_info(saved)
+      if aliases[saved] or (info and info.error) then
+        local name = conform_name(conform, saved, utils.get_builtins(ft, "Formatter"))
+        local current = load_state()
+        current.filetypes[ft] = name
+        save_state()
+        saved = name
+      end
     end
 
     if saved and saved ~= "" then

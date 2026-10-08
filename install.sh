@@ -109,8 +109,20 @@ install_arch() {
     fi
 }
 
+is_el() {
+    # Enterprise Linux (RHEL, Rocky, Alma, Oracle, CentOS Stream), which needs
+    # EPEL. Not Fedora or its derivatives (Nobara, Asahi Remix, Ultramarine),
+    # whose ID_LIKE can also say "rhel centos".
+    case "$(os_release_field PLATFORM_ID)" in
+        platform:el*) return 0 ;;
+    esac
+    [ -n "$(rpm -E '%{?rhel}' 2>/dev/null)" ]
+}
+
 epel_enabled() {
-    dnf repolist --enabled 2>/dev/null | grep -qi '^epel'
+    # Repo ids: "epel" (Rocky/Alma/RHEL) or "ol9_developer_EPEL" (Oracle).
+    # awk reads all of dnf's output, so pipefail can't see a SIGPIPE.
+    dnf repolist --enabled 2>/dev/null | awk 'tolower($1) ~ /^epel|_epel$/ { f = 1 } END { exit !f }'
 }
 
 epel_help() {
@@ -119,7 +131,8 @@ epel_help() {
     case "$1" in
         rhel) echo '  sudo subscription-manager repos --enable "codeready-builder-for-rhel-$(rpm -E %rhel)-$(arch)-rpms"'
               echo '  sudo dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm"' ;;
-        ol)   echo '  sudo dnf install -y "oracle-epel-release-el$(rpm -E %rhel)"' ;;
+        ol)   echo '  sudo dnf install -y "oracle-epel-release-el$(rpm -E %rhel)"'
+              echo '  sudo dnf config-manager --enable "ol$(rpm -E %rhel)_developer_EPEL"' ;;
         *)    echo '  sudo dnf install -y epel-release && sudo dnf config-manager --set-enabled crb' ;;
     esac
 }
@@ -203,7 +216,7 @@ main() {
     family="$(detect_family "$os_id" "$os_like")"
     [ "$family" != "unsupported" ] || die "Unsupported distro '$os_id'. See the manual install steps: https://github.com/$REPO#option-4-manual-installation"
 
-    if [ "$family" = "fedora" ] && [ "$os_id" != "fedora" ] && ! epel_enabled; then
+    if [ "$family" = "fedora" ] && is_el && ! epel_enabled; then
         epel_help "$os_id"
         die "EPEL is not enabled; enable it and re-run the installer."
     fi

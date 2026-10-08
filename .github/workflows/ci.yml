@@ -72,7 +72,9 @@ jobs:
       # The published <= 1.0.9 packages wiped every user's data from their
       # postrm during upgrades; the new preinst/postinst must protect it.
       - name: Upgrade from the published v1.0.9 keeps user data
+        shell: bash
         run: |
+          set -eo pipefail
           apt-get update
           apt-get install -y curl ca-certificates
           curl -fsSL -o /tmp/lazychad-1.0.9.deb \
@@ -81,7 +83,9 @@ jobs:
           mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy /root/.config/LazyChad
           touch /home/tester/.config/LazyChad/mine.lua /root/.config/LazyChad/mine.lua
           # dpkg -i runs the old postrm even when the version is unchanged
-          dpkg -i ./lazychad_*.deb
+          dpkg -i ./lazychad_*.deb 2>&1 | tee /tmp/upgrade.log
+          # prove v1.0.9's wiping postrm really ran, so this can't pass vacuously
+          grep -F "Cleaning up LazyChad user directories" /tmp/upgrade.log
           test -f /home/tester/.config/LazyChad/mine.lua
           test -d /home/tester/.local/share/LazyChad/lazy
           test -f /root/.config/LazyChad/mine.lua
@@ -122,12 +126,17 @@ jobs:
           name: packages
 
       - name: Upgrade from the published v1.0.9 keeps user data
+        shell: bash
         run: |
+          set -eo pipefail
           dnf install -y https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad-1.0.9-1.noarch.rpm
           mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy
           touch /home/tester/.config/LazyChad/mine.lua
-          # a reinstall erases the old package, running its wiping %postun
-          dnf reinstall -y ./lazychad-*.rpm
+          # -U --replacepkgs works for both a same-version reinstall and a real
+          # upgrade; either way the old package's wiping %postun runs
+          rpm -Uvh --replacepkgs ./lazychad-*.rpm 2>&1 | tee /tmp/upgrade.log
+          grep -F "Cleaning up LazyChad user directories" /tmp/upgrade.log
+          test "$(rpm -q lazychad)" = "$(rpm -qp ./lazychad-*.rpm)"
           test -f /home/tester/.config/LazyChad/mine.lua
           test -d /home/tester/.local/share/LazyChad/lazy
           test -z "$(find /home -name '*.pkg-upgrade' -print -quit)"
