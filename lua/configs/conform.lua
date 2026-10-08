@@ -3,12 +3,16 @@ local M = {}
 local function load_formatters()
   local state_path = vim.fn.stdpath "data" .. "/formatter_picker_state.json"
   local f = io.open(state_path, "r")
-  if not f then return {} end
+  if not f then
+    return {}
+  end
   local content = f:read "*a"
   f:close()
   local ok, state = pcall(vim.json.decode, content)
-  if not ok or not state or not state.filetypes then return {} end
-  
+  if not ok or not state or not state.filetypes then
+    return {}
+  end
+
   local formatters = {}
   for ft, tool in pairs(state.filetypes) do
     if tool ~= "__none__" then

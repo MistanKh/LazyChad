@@ -9,7 +9,9 @@ local state = nil
 local prompting = {}
 
 local function load_state()
-  if state then return state end
+  if state then
+    return state
+  end
   state = utils.read_json(state_path) or { filetypes = {} }
   return state
 end
@@ -20,25 +22,31 @@ end
 
 local function set_formatter(ft, formatter)
   local ok, conform = pcall(require, "conform")
-  if ok then conform.formatters_by_ft[ft] = { formatter } end
+  if ok then
+    conform.formatters_by_ft[ft] = { formatter }
+  end
 end
 
 local function package_name_for(formatter)
   local ok, conform = pcall(require, "conform")
-  if not ok then return formatter end
+  if not ok then
+    return formatter
+  end
   local info = conform.get_formatter_info(formatter)
   return utils.package_name_by_bin(info and info.command or formatter)
 end
 
 function M.choose_for_filetype(ft, priority_delay)
-  if not ft or ft == "" or prompting[ft] then return end
+  if not ft or ft == "" or prompting[ft] then
+    return
+  end
   prompting[ft] = true
 
   utils.on_registry_ready(function()
     local function run()
       local candidates = utils.get_mason_candidates(ft, "Formatter")
       vim.list_extend(candidates, utils.get_builtins(ft, "Formatter"))
-      
+
       if #candidates == 0 then
         prompting[ft] = nil
         return
@@ -46,32 +54,38 @@ function M.choose_for_filetype(ft, priority_delay)
 
       local recommended = utils.get_recommendation(ft, "Formatter")
       local builtin_formatters = utils.get_builtins(ft, "Formatter")
-      
+
       local display_map = {}
       local seen = {}
       local ok_conform, conform = pcall(require, "conform")
-      
+
       local valid = {}
       if ok_conform then
-        valid = vim.iter(candidates):filter(function(c)
-          local info = conform.get_formatter_info(c)
-          local info_alt = not (info and info.command) and conform.get_formatter_info((c:gsub("%-", "_"))) or nil
-          
-          local tool = (info and info.command) and c or (info_alt and info_alt.command and c:gsub("%-", "_") or nil)
-          if not tool and vim.list_contains(builtin_formatters, c) then tool = c end
-          
-          if tool and not seen[tool] then
-            seen[tool] = true
-            return true
-          end
-          return false
-        end):map(function(c)
-          local info = conform.get_formatter_info(c)
-          local tool = (info and info.command) and c or c:gsub("%-", "_")
-          local label = tool == recommended and (tool .. " (Recommended)") or tool
-          display_map[label] = tool
-          return label
-        end):totable()
+        valid = vim
+          .iter(candidates)
+          :filter(function(c)
+            local info = conform.get_formatter_info(c)
+            local info_alt = not (info and info.command) and conform.get_formatter_info((c:gsub("%-", "_"))) or nil
+
+            local tool = (info and info.command) and c or (info_alt and info_alt.command and c:gsub("%-", "_") or nil)
+            if not tool and vim.list_contains(builtin_formatters, c) then
+              tool = c
+            end
+
+            if tool and not seen[tool] then
+              seen[tool] = true
+              return true
+            end
+            return false
+          end)
+          :map(function(c)
+            local info = conform.get_formatter_info(c)
+            local tool = (info and info.command) and c or c:gsub("%-", "_")
+            local label = tool == recommended and (tool .. " (Recommended)") or tool
+            display_map[label] = tool
+            return label
+          end)
+          :totable()
       end
 
       if #valid == 0 then
@@ -81,8 +95,12 @@ function M.choose_for_filetype(ft, priority_delay)
 
       -- Sort valid items, recommended first
       table.sort(valid, function(a, b)
-        if a:find("(Recommended)") then return true end
-        if b:find("(Recommended)") then return false end
+        if a:find "(Recommended)" then
+          return true
+        end
+        if b:find "(Recommended)" then
+          return false
+        end
         return a < b
       end)
 
@@ -94,7 +112,9 @@ function M.choose_for_filetype(ft, priority_delay)
         title = " Formatter Picker ",
       }, function(choice)
         prompting[ft] = nil
-        if not choice then return end
+        if not choice then
+          return
+        end
 
         local tool = display_map[choice] or choice
         local current = load_state()
@@ -104,16 +124,24 @@ function M.choose_for_filetype(ft, priority_delay)
         if tool ~= "None" then
           if vim.list_contains(builtin_formatters, tool) then
             set_formatter(ft, tool)
-            vim.notify("LazyChad: " .. tool .. " set as formatter for " .. ft .. " (Format on Save enabled)", vim.log.levels.INFO)
+            vim.notify(
+              "LazyChad: " .. tool .. " set as formatter for " .. ft .. " (Format on Save enabled)",
+              vim.log.levels.INFO
+            )
           else
             utils.ensure_installed(package_name_for(tool), "formatter", tool, function()
               set_formatter(ft, tool)
-              vim.notify("LazyChad: " .. tool .. " installed and set as formatter for " .. ft .. " (Format on Save enabled)", vim.log.levels.INFO)
+              vim.notify(
+                "LazyChad: " .. tool .. " installed and set as formatter for " .. ft .. " (Format on Save enabled)",
+                vim.log.levels.INFO
+              )
             end)
           end
         else
           local ok, c = pcall(require, "conform")
-          if ok then c.formatters_by_ft[ft] = nil end
+          if ok then
+            c.formatters_by_ft[ft] = nil
+          end
           vim.notify("LazyChad: Formatter disabled for " .. ft, vim.log.levels.INFO)
         end
       end)
@@ -129,22 +157,32 @@ end
 
 local function get_saved_choice(ft)
   local state = load_state()
-  if state.filetypes[ft] then return state.filetypes[ft] end
-  local base = ft:match("^([^%.]+)")
-  if base and state.filetypes[base] then return state.filetypes[base] end
+  if state.filetypes[ft] then
+    return state.filetypes[ft]
+  end
+  local base = ft:match "^([^%.]+)"
+  if base and state.filetypes[base] then
+    return state.filetypes[base]
+  end
   return nil
 end
 
 function M.setup()
   local group = vim.api.nvim_create_augroup("formatter_picker", { clear = true })
-  
+
   local function check_buffer(buf)
-    if not vim.api.nvim_buf_is_valid(buf) then return end
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return
+    end
     local ft = vim.bo[buf].filetype
-    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then return end
+    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then
+      return
+    end
 
     local saved = get_saved_choice(ft)
-    if saved == none_choice then return end
+    if saved == none_choice then
+      return
+    end
 
     if saved and saved ~= "" then
       local is_builtin = vim.list_contains(utils.get_builtins(ft, "Formatter"), saved)
@@ -167,11 +205,15 @@ function M.setup()
         local current = load_state()
         current.filetypes[ft] = nil
         save_state()
-        vim.schedule(function() M.choose_for_filetype(ft) end)
+        vim.schedule(function()
+          M.choose_for_filetype(ft)
+        end)
       end
     else
       -- Initial boot: give lowest priority to Formatter (200ms)
-      vim.schedule(function() M.choose_for_filetype(ft, 200) end)
+      vim.schedule(function()
+        M.choose_for_filetype(ft, 200)
+      end)
     end
   end
 

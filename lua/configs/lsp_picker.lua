@@ -21,7 +21,9 @@ local package_aliases = {
 }
 
 local function load_state()
-  if state then return state end
+  if state then
+    return state
+  end
   state = utils.read_json(state_path) or { filetypes = {} }
   return state
 end
@@ -31,8 +33,10 @@ local function save_state()
 end
 
 local function get_server_specs()
-  if server_specs and next(server_specs) then return server_specs end
-  
+  if server_specs and next(server_specs) then
+    return server_specs
+  end
+
   local lspconfig_path = nil
   local ok_lazy, lazy_config = pcall(require, "lazy.core.config")
   if ok_lazy and lazy_config.plugins["nvim-lspconfig"] then
@@ -50,8 +54,10 @@ local function get_server_specs()
     end
   end
 
-  if not lspconfig_path then return {} end
-  
+  if not lspconfig_path then
+    return {}
+  end
+
   local path = lspconfig_path .. "/lsp"
   local files = vim.fn.globpath(path, "*.lua", false, true)
   local specs = {}
@@ -60,7 +66,9 @@ local function get_server_specs()
     local chunk = loadfile(file)
     if chunk then
       local ok, spec = pcall(chunk)
-      if ok and type(spec) == "table" then specs[name] = spec end
+      if ok and type(spec) == "table" then
+        specs[name] = spec
+      end
     end
   end
   server_specs = specs
@@ -72,17 +80,23 @@ local setup_servers = {}
 local package_name_cache = {}
 
 local function package_name_for(server)
-  if package_aliases[server] then return package_aliases[server] end
-  if package_name_cache[server] then return package_name_cache[server] end
-  
-  local registry_ok, registry = pcall(require, "mason-registry")
-  if not registry_ok then return server end
-  
-  if registry.has_package(server) then 
-    package_name_cache[server] = server
-    return server 
+  if package_aliases[server] then
+    return package_aliases[server]
   end
-  
+  if package_name_cache[server] then
+    return package_name_cache[server]
+  end
+
+  local registry_ok, registry = pcall(require, "mason-registry")
+  if not registry_ok then
+    return server
+  end
+
+  if registry.has_package(server) then
+    package_name_cache[server] = server
+    return server
+  end
+
   for _, name in ipairs(registry.get_all_package_names()) do
     local ok, pkg = pcall(registry.get_package, name)
     if ok and pkg and pkg.spec and pkg.spec.neovim and pkg.spec.neovim.lspconfig == server then
@@ -90,22 +104,28 @@ local function package_name_for(server)
       return name
     end
   end
-  
+
   return server
 end
 
 local function setup_server(server)
-  if setup_servers[server] then return end
+  if setup_servers[server] then
+    return
+  end
   local ok_lsp, lspconfig = pcall(require, "lspconfig")
-  if not ok_lsp then return end
-  
+  if not ok_lsp then
+    return
+  end
+
   local ok_nv, nv_lsp = pcall(require, "nvchad.configs.lspconfig")
-  if not ok_nv then return end
-  
+  if not ok_nv then
+    return
+  end
+
   local on_attach = nv_lsp.on_attach
   local on_init = nv_lsp.on_init
   local capabilities = nv_lsp.capabilities
-  
+
   -- Check if the new Neovim 0.11+ API is available
   -- vim.lsp.config[server] returns a resolved copy, so extend the config via
   -- vim.lsp.config() instead of mutating that table
@@ -124,56 +144,68 @@ local function setup_server(server)
 
   local config = lspconfig[server]
   if config then
-     config.setup {
-       on_attach = on_attach,
-       on_init = on_init,
-       capabilities = capabilities,
-       root_dir = function(fname)
-         return vim.fs.root(fname, ".git") or vim.uv.cwd()
-       end,
-     }
-     setup_servers[server] = true
+    config.setup {
+      on_attach = on_attach,
+      on_init = on_init,
+      capabilities = capabilities,
+      root_dir = function(fname)
+        return vim.fs.root(fname, ".git") or vim.uv.cwd()
+      end,
+    }
+    setup_servers[server] = true
   end
 end
 
 function M.choose_for_filetype(ft, priority_delay)
-  if not ft or ft == "" or prompting[ft] then return end
+  if not ft or ft == "" or prompting[ft] then
+    return
+  end
   prompting[ft] = true
-  
+
   utils.on_registry_ready(function()
     local function run()
       local candidates = utils.get_mason_candidates(ft, "LSP")
       vim.list_extend(candidates, utils.get_builtins(ft, "LSP"))
-      
+
       if #candidates == 0 then
         prompting[ft] = nil
         return
       end
-      
+
       local specs = get_server_specs()
       local recommended = utils.get_recommendation(ft, "LSP")
       local builtin_lsps = utils.get_builtins(ft, "LSP")
-      
+
       local display_map = {}
       local seen = {}
-      
-      local valid = vim.iter(candidates):filter(function(c)
-        if seen[c] then return false end
-        if specs[c] or vim.list_contains(builtin_lsps, c) then
-          seen[c] = true
-          return true
-        end
-        return false
-      end):map(function(c)
-        local label = c == recommended and (c .. " (Recommended)") or c
-        display_map[label] = c
-        return label
-      end):totable()
+
+      local valid = vim
+        .iter(candidates)
+        :filter(function(c)
+          if seen[c] then
+            return false
+          end
+          if specs[c] or vim.list_contains(builtin_lsps, c) then
+            seen[c] = true
+            return true
+          end
+          return false
+        end)
+        :map(function(c)
+          local label = c == recommended and (c .. " (Recommended)") or c
+          display_map[label] = c
+          return label
+        end)
+        :totable()
 
       -- Ensure recommended is at the top
       table.sort(valid, function(a, b)
-        if a:find("(Recommended)") then return true end
-        if b:find("(Recommended)") then return false end
+        if a:find "(Recommended)" then
+          return true
+        end
+        if b:find "(Recommended)" then
+          return false
+        end
         return a < b
       end)
 
@@ -190,8 +222,10 @@ function M.choose_for_filetype(ft, priority_delay)
         title = " LSP Picker ",
       }, function(choice)
         prompting[ft] = nil
-        if not choice then return end
-        
+        if not choice then
+          return
+        end
+
         local server = display_map[choice] or choice
         local current = load_state()
         current.filetypes[ft] = (server == "None") and none_choice or server
@@ -219,27 +253,37 @@ end
 
 local function get_saved_choice(ft)
   local state = load_state()
-  if state.filetypes[ft] then return state.filetypes[ft] end
-  local base = ft:match("^([^%.]+)")
-  if base and state.filetypes[base] then return state.filetypes[base] end
+  if state.filetypes[ft] then
+    return state.filetypes[ft]
+  end
+  local base = ft:match "^([^%.]+)"
+  if base and state.filetypes[base] then
+    return state.filetypes[base]
+  end
   return nil
 end
 
 function M.setup()
   local group = vim.api.nvim_create_augroup("lsp_picker", { clear = true })
-  
+
   local function check_buffer(buf)
-    if not vim.api.nvim_buf_is_valid(buf) then return end
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return
+    end
     local ft = vim.bo[buf].filetype
-    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then return end
-    
+    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then
+      return
+    end
+
     local saved = get_saved_choice(ft)
-    if saved == none_choice then return end
-    
+    if saved == none_choice then
+      return
+    end
+
     if saved and saved ~= "" then
       local is_builtin = vim.list_contains(utils.get_builtins(ft, "LSP"), saved)
       local is_installed = is_builtin
-      
+
       local registry_ok, registry = pcall(require, "mason-registry")
       if not is_installed and registry_ok then
         local pkg_name = package_name_for(saved)
@@ -256,11 +300,15 @@ function M.setup()
         local current = load_state()
         current.filetypes[ft] = nil
         save_state()
-        vim.schedule(function() M.choose_for_filetype(ft) end)
+        vim.schedule(function()
+          M.choose_for_filetype(ft)
+        end)
       end
     else
       -- Initial boot: give slight priority to LSP (0ms)
-      vim.schedule(function() M.choose_for_filetype(ft) end)
+      vim.schedule(function()
+        M.choose_for_filetype(ft)
+      end)
     end
   end
 

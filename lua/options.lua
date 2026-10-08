@@ -24,11 +24,11 @@ vim.o.termguicolors = true
 
 -- The "Nuclear Option": Stop Neovim from querying terminal capabilities entirely
 -- This prevents the terminal from ever sending the +q4D73 response.
-vim.cmd([[
+vim.cmd [[
   let &t_u7 = ""
   let &t_TI = ""
   let &t_TE = ""
-]])
+]]
 
 -- Final safety: Clear any leaked characters if they still managed to get in during the first 50ms
 vim.api.nvim_create_autocmd("VimEnter", {

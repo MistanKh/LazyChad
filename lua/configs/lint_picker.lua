@@ -9,7 +9,9 @@ local state = nil
 local prompting = {}
 
 local function load_state()
-  if state then return state end
+  if state then
+    return state
+  end
   state = utils.read_json(state_path) or { filetypes = {} }
   return state
 end
@@ -28,23 +30,31 @@ end
 
 local function package_name_for(linter)
   local ok, lint = pcall(require, "lint")
-  if not ok then return linter end
+  if not ok then
+    return linter
+  end
   local spec = lint.linters[linter]
-  if not spec then return linter end
+  if not spec then
+    return linter
+  end
   local cmd = type(spec) == "table" and spec.cmd or linter
-  if type(cmd) == "function" then cmd = cmd() end
+  if type(cmd) == "function" then
+    cmd = cmd()
+  end
   return utils.package_name_by_bin(cmd or linter)
 end
 
 function M.choose_for_filetype(ft, priority_delay)
-  if not ft or ft == "" or prompting[ft] then return end
+  if not ft or ft == "" or prompting[ft] then
+    return
+  end
   prompting[ft] = true
 
   utils.on_registry_ready(function()
     local function run()
       local candidates = utils.get_mason_candidates(ft, "Linter")
       vim.list_extend(candidates, utils.get_builtins(ft, "Linter"))
-      
+
       if #candidates == 0 then
         prompting[ft] = nil
         return
@@ -52,36 +62,49 @@ function M.choose_for_filetype(ft, priority_delay)
 
       local recommended = utils.get_recommendation(ft, "Linter")
       local builtin_linters = utils.get_builtins(ft, "Linter")
-      
+
       local display_map = {}
       local seen = {}
       local ok_lint, lint = pcall(require, "lint")
-      
+
       local valid = {}
       if ok_lint then
-        valid = vim.iter(candidates):filter(function(c)
-          if seen[c] then return false end
-          
-          local tool = nil
-          if lint.linters[c] then tool = c
-          elseif lint.linters[c:gsub("%-", "")] then tool = c:gsub("%-", "")
-          elseif lint.linters[c:gsub("%-", "_")] then tool = c:gsub("%-", "_")
-          elseif vim.list_contains(builtin_linters, c) then tool = c
-          end
+        valid = vim
+          .iter(candidates)
+          :filter(function(c)
+            if seen[c] then
+              return false
+            end
 
-          if tool then
-            seen[c] = true
-            return true
-          end
-          return false
-        end):map(function(c)
-          local tool = lint.linters[c] and c or (lint.linters[c:gsub("%-", "")] and c:gsub("%-", "") or c:gsub("%-", "_"))
-          if not lint.linters[tool] then tool = c end
-          
-          local label = tool == recommended and (tool .. " (Recommended)") or tool
-          display_map[label] = tool
-          return label
-        end):totable()
+            local tool = nil
+            if lint.linters[c] then
+              tool = c
+            elseif lint.linters[c:gsub("%-", "")] then
+              tool = c:gsub("%-", "")
+            elseif lint.linters[c:gsub("%-", "_")] then
+              tool = c:gsub("%-", "_")
+            elseif vim.list_contains(builtin_linters, c) then
+              tool = c
+            end
+
+            if tool then
+              seen[c] = true
+              return true
+            end
+            return false
+          end)
+          :map(function(c)
+            local tool = lint.linters[c] and c
+              or (lint.linters[c:gsub("%-", "")] and c:gsub("%-", "") or c:gsub("%-", "_"))
+            if not lint.linters[tool] then
+              tool = c
+            end
+
+            local label = tool == recommended and (tool .. " (Recommended)") or tool
+            display_map[label] = tool
+            return label
+          end)
+          :totable()
       end
 
       if #valid == 0 then
@@ -91,8 +114,12 @@ function M.choose_for_filetype(ft, priority_delay)
 
       -- Sort valid items, recommended first
       table.sort(valid, function(a, b)
-        if a:find("(Recommended)") then return true end
-        if b:find("(Recommended)") then return false end
+        if a:find "(Recommended)" then
+          return true
+        end
+        if b:find "(Recommended)" then
+          return false
+        end
         return a < b
       end)
 
@@ -104,7 +131,9 @@ function M.choose_for_filetype(ft, priority_delay)
         title = " Linter Picker ",
       }, function(choice)
         prompting[ft] = nil
-        if not choice then return end
+        if not choice then
+          return
+        end
 
         local tool = display_map[choice] or choice
         local current = load_state()
@@ -123,7 +152,9 @@ function M.choose_for_filetype(ft, priority_delay)
           end
         else
           local ok, l = pcall(require, "lint")
-          if ok then l.linters_by_ft[ft] = nil end
+          if ok then
+            l.linters_by_ft[ft] = nil
+          end
           vim.notify("LazyChad: Linter disabled for " .. ft, vim.log.levels.INFO)
         end
       end)
@@ -139,9 +170,13 @@ end
 
 local function get_saved_choice(ft)
   local state = load_state()
-  if state.filetypes[ft] then return state.filetypes[ft] end
-  local base = ft:match("^([^%.]+)")
-  if base and state.filetypes[base] then return state.filetypes[base] end
+  if state.filetypes[ft] then
+    return state.filetypes[ft]
+  end
+  local base = ft:match "^([^%.]+)"
+  if base and state.filetypes[base] then
+    return state.filetypes[base]
+  end
   return nil
 end
 
@@ -149,12 +184,18 @@ function M.setup()
   local group = vim.api.nvim_create_augroup("lint_picker", { clear = true })
 
   local function check_buffer(buf)
-    if not vim.api.nvim_buf_is_valid(buf) then return end
+    if not vim.api.nvim_buf_is_valid(buf) then
+      return
+    end
     local ft = vim.bo[buf].filetype
-    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then return end
+    if not ft or ft == "" or vim.bo[buf].buftype ~= "" then
+      return
+    end
 
     local saved = get_saved_choice(ft)
-    if saved == none_choice then return end
+    if saved == none_choice then
+      return
+    end
 
     if saved and saved ~= "" then
       local is_builtin = vim.list_contains(utils.get_builtins(ft, "Linter"), saved)
@@ -177,11 +218,15 @@ function M.setup()
         local current = load_state()
         current.filetypes[ft] = nil
         save_state()
-        vim.schedule(function() M.choose_for_filetype(ft) end)
+        vim.schedule(function()
+          M.choose_for_filetype(ft)
+        end)
       end
     else
       -- Initial boot: give medium priority to Linter (100ms)
-      vim.schedule(function() M.choose_for_filetype(ft, 100) end)
+      vim.schedule(function()
+        M.choose_for_filetype(ft, 100)
+      end)
     end
   end
 
@@ -200,7 +245,9 @@ function M.setup()
     group = group,
     callback = function()
       local ok, lint = pcall(require, "lint")
-      if ok then lint.try_lint() end
+      if ok then
+        lint.try_lint()
+      end
     end,
   })
 

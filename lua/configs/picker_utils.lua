@@ -5,7 +5,9 @@ local failure_blacklist = {}
 
 function M.read_json(path)
   local fd = vim.uv.fs_open(path, "r", 438)
-  if not fd then return nil end
+  if not fd then
+    return nil
+  end
   local stat = vim.uv.fs_fstat(fd)
   if not stat then
     vim.uv.fs_close(fd)
@@ -19,7 +21,9 @@ end
 
 function M.write_json(path, data)
   local fd = vim.uv.fs_open(path, "w", 420)
-  if not fd then return end
+  if not fd then
+    return
+  end
   vim.uv.fs_write(fd, vim.json.encode(data), 0)
   vim.uv.fs_close(fd)
 end
@@ -55,7 +59,7 @@ local recommendations = {
     typescript = "eslint_d",
     sh = "shellcheck",
     go = "golangcilint",
-  }
+  },
 }
 
 local builtins = {
@@ -67,19 +71,23 @@ local builtins = {
   },
   Linter = {
     rust = { "clippy" },
-  }
+  },
 }
 
 function M.get_builtins(ft, category)
   local cat = builtins[category]
-  if not cat then return {} end
-  return cat[ft:match("^([^%.]+)")] or cat[ft] or {}
+  if not cat then
+    return {}
+  end
+  return cat[ft:match "^([^%.]+)"] or cat[ft] or {}
 end
 
 function M.get_recommendation(ft, category)
   local cat = recommendations[category]
-  if not cat then return nil end
-  return cat[ft:match("^([^%.]+)")] or cat[ft]
+  if not cat then
+    return nil
+  end
+  return cat[ft:match "^([^%.]+)"] or cat[ft]
 end
 
 local ft_mappings = {
@@ -116,39 +124,53 @@ end
 
 function M.get_mason_candidates(ft, category)
   local registry_ok, registry = pcall(require, "mason-registry")
-  if not registry_ok then return {} end
-  
+  if not registry_ok then
+    return {}
+  end
+
   local packages = registry.get_all_packages()
-  local ft_base = ft:match("^([^%.]+)") or ft
+  local ft_base = ft:match "^([^%.]+)" or ft
   local mapped_ft = ft_mappings[ft_base] or ft_base
-  
-  return vim.iter(packages):filter(function(pkg)
-    local spec = pkg.spec
-    if not spec.categories or not spec.languages then return false end
-    
-    local has_category = vim.iter(spec.categories):any(function(cat)
-      return cat:lower() == category:lower()
+
+  return vim
+    .iter(packages)
+    :filter(function(pkg)
+      local spec = pkg.spec
+      if not spec.categories or not spec.languages then
+        return false
+      end
+
+      local has_category = vim.iter(spec.categories):any(function(cat)
+        return cat:lower() == category:lower()
+      end)
+
+      if not has_category then
+        return false
+      end
+
+      return vim.iter(spec.languages):any(function(lang)
+        local l = lang:lower():gsub(" ", "")
+        return l == ft_base:lower() or l == ft:lower() or l == mapped_ft:lower()
+      end)
     end)
-    
-    if not has_category then return false end
-    
-    return vim.iter(spec.languages):any(function(lang)
-      local l = lang:lower():gsub(" ", "")
-      return l == ft_base:lower() or l == ft:lower() or l == mapped_ft:lower()
+    :map(function(pkg)
+      if category == "LSP" and pkg.spec.neovim and pkg.spec.neovim.lspconfig then
+        return pkg.spec.neovim.lspconfig
+      end
+      return pkg.name
     end)
-  end):map(function(pkg)
-    if category == "LSP" and pkg.spec.neovim and pkg.spec.neovim.lspconfig then
-      return pkg.spec.neovim.lspconfig
-    end
-    return pkg.name
-  end):totable()
+    :totable()
 end
 
 function M.package_name_by_bin(bin_name)
   local registry_ok, registry = pcall(require, "mason-registry")
-  if not registry_ok then return bin_name end
-  
-  if registry.has_package(bin_name) then return bin_name end
+  if not registry_ok then
+    return bin_name
+  end
+
+  if registry.has_package(bin_name) then
+    return bin_name
+  end
 
   if not registry_bin_cache then
     registry_bin_cache = {}
@@ -161,7 +183,7 @@ function M.package_name_by_bin(bin_name)
       end
     end
   end
-  
+
   return registry_bin_cache[bin_name] or bin_name
 end
 
@@ -180,7 +202,9 @@ function M.ensure_installed(pkg_name, tool_type, display_name, callback)
     return
   end
 
-  if failure_blacklist[pkg_name] then return end
+  if failure_blacklist[pkg_name] then
+    return
+  end
 
   if not registry.has_package(pkg_name) then
     vim.notify("Package " .. pkg_name .. " not found in Mason", vim.log.levels.WARN)
@@ -196,16 +220,25 @@ function M.ensure_installed(pkg_name, tool_type, display_name, callback)
 
   vim.notify("Installing " .. tool_type .. " " .. display_name .. " via Mason", vim.log.levels.INFO)
 
-  pkg:once("install:success", vim.schedule_wrap(function()
-    failure_blacklist[pkg_name] = nil
-    vim.notify("Installed " .. display_name .. " successfully", vim.log.levels.INFO)
-    callback()
-  end))
+  pkg:once(
+    "install:success",
+    vim.schedule_wrap(function()
+      failure_blacklist[pkg_name] = nil
+      vim.notify("Installed " .. display_name .. " successfully", vim.log.levels.INFO)
+      callback()
+    end)
+  )
 
-  pkg:once("install:failed", vim.schedule_wrap(function()
-    failure_blacklist[pkg_name] = true
-    vim.notify("Mason failed to install " .. pkg_name .. ". Auto-setup disabled for this tool. Check :Mason", vim.log.levels.ERROR)
-  end))
+  pkg:once(
+    "install:failed",
+    vim.schedule_wrap(function()
+      failure_blacklist[pkg_name] = true
+      vim.notify(
+        "Mason failed to install " .. pkg_name .. ". Auto-setup disabled for this tool. Check :Mason",
+        vim.log.levels.ERROR
+      )
+    end)
+  )
 
   if not pkg:is_installing() then
     pkg:install()

@@ -4,10 +4,12 @@ local queue = {}
 local active = nil
 
 local function close_active()
-  if not active then return end
+  if not active then
+    return
+  end
   local a = active
   active = nil -- Clear before acting to prevent recursion
-  
+
   if a.win and vim.api.nvim_win_is_valid(a.win) then
     vim.api.nvim_win_close(a.win, true)
   end
@@ -17,8 +19,10 @@ local function close_active()
 end
 
 local function run_next()
-  if active or #queue == 0 then return end
-  
+  if active or #queue == 0 then
+    return
+  end
+
   local req = table.remove(queue, 1)
   local items = req.items
   local opts = req.opts or {}
@@ -58,17 +62,21 @@ local function run_next()
   })
 
   active = { buf = buf, win = win, callback = callback, items = items }
-  
+
   vim.wo[win].cursorline = true
   vim.wo[win].winhighlight = "Normal:Normal,FloatBorder:Keyword,CursorLine:Visual"
   vim.api.nvim_win_set_cursor(win, { 3, 2 })
 
   local finished = false
   local function finish(choice)
-    if finished then return end
+    if finished then
+      return
+    end
     finished = true
     close_active()
-    if callback then callback(choice) end
+    if callback then
+      callback(choice)
+    end
     vim.schedule(run_next)
   end
 
@@ -80,7 +88,9 @@ local function run_next()
       if not finished then
         finished = true
         active = nil
-        if callback then callback(nil) end
+        if callback then
+          callback(nil)
+        end
         vim.schedule(run_next)
       end
     end,
@@ -105,12 +115,16 @@ local function run_next()
 
   map("j", function()
     local curr = vim.api.nvim_win_get_cursor(win)[1]
-    if curr < height then vim.api.nvim_win_set_cursor(win, { curr + 1, 2 }) end
+    if curr < height then
+      vim.api.nvim_win_set_cursor(win, { curr + 1, 2 })
+    end
   end)
 
   map("k", function()
     local curr = vim.api.nvim_win_get_cursor(win)[1]
-    if curr > 3 then vim.api.nvim_win_set_cursor(win, { curr - 1, 2 }) end
+    if curr > 3 then
+      vim.api.nvim_win_set_cursor(win, { curr - 1, 2 })
+    end
   end)
 
   map("<CR>", function()
@@ -118,8 +132,12 @@ local function run_next()
     finish(items[curr - 2])
   end)
 
-  map("q", function() finish(nil) end)
-  map("<Esc>", function() finish(nil) end)
+  map("q", function()
+    finish(nil)
+  end)
+  map("<Esc>", function()
+    finish(nil)
+  end)
 end
 
 function M.select(items, opts, callback)

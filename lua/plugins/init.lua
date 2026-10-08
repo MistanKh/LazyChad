@@ -4,7 +4,7 @@ return {
     opts = {
       ensure_installed = {
         "lua-language-server", -- Essential for Neovim config
-        "stylua",              -- Essential for Neovim config
+        "stylua", -- Essential for Neovim config
       },
     },
   },
@@ -29,12 +29,16 @@ return {
   },
 
   {
-  	"nvim-treesitter/nvim-treesitter",
-  	opts = {
-  		ensure_installed = {
-  			"vim", "lua", "vimdoc",
-       "html", "css", "python"
-  		},
-  	},
+    "nvim-treesitter/nvim-treesitter",
+    opts = {
+      ensure_installed = {
+        "vim",
+        "lua",
+        "vimdoc",
+        "html",
+        "css",
+        "python",
+      },
+    },
   },
 }

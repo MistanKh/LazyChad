@@ -2,12 +2,12 @@
 local M = {}
 
 M.base46 = {
-	theme = "rosepine",
+  theme = "rosepine",
 
-	hl_override = {
-		Comment = { italic = true },
-		["@comment"] = { italic = true },
-	},
+  hl_override = {
+    Comment = { italic = true },
+    ["@comment"] = { italic = true },
+  },
 }
 
 M.nvdash = {
@@ -21,7 +21,7 @@ M.nvdash = {
     end
 
     local status = count > 0 and "OPTIMIZED" or "INITIALIZING"
-    
+
     local version = "?.?.?"
     local ver_path = vim.fn.stdpath "config" .. "/.version"
     local f = io.open(ver_path, "r")
@@ -29,7 +29,7 @@ M.nvdash = {
       version = f:read("*all"):gsub("%s+", "")
       f:close()
     end
-    
+
     return {
       "",
       "╔════════════════════════════════════════════════════════════════╗",
@@ -44,7 +44,13 @@ M.nvdash = {
       "╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝",
       "",
       "──────────────────────────────────────────────────────────────────",
-      " INTELLIGENCE: " .. string.format("%-11s", status) .. "|  VERSION: " .. string.format("%-7s", version) .. "|  MAPPINGS: " .. string.format("%-2d", count) .. " ",
+      " INTELLIGENCE: "
+        .. string.format("%-11s", status)
+        .. "|  VERSION: "
+        .. string.format("%-7s", version)
+        .. "|  MAPPINGS: "
+        .. string.format("%-2d", count)
+        .. " ",
       "──────────────────────────────────────────────────────────────────",
       "",
     }
@@ -119,8 +125,8 @@ M.nvdash = {
 
 M.ui = {
   tabufline = {
-    lazyload = false
-  }
+    lazyload = false,
+  },
 }
 
 return M
