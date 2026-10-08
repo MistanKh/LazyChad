@@ -75,11 +75,29 @@ local function install_parsers(timeout_ms)
 
   local ok, ts = pcall(require, "nvim-treesitter")
   if ok and type(ts.install) == "function" then
-    -- nvim-treesitter `main` branch: async install with a waitable task
+    -- nvim-treesitter `main` branch: async install with a waitable task. A
+    -- parser that fails to build is only logged, so check what got installed.
     local ok_install, err = pcall(function()
-      ts.install(M.treesitter_parsers):wait(timeout_ms)
+      return ts.install(M.treesitter_parsers):wait(timeout_ms)
     end)
-    return ok_install and {} or { "treesitter parsers: " .. tostring(err) }
+    if not ok_install then
+      return { "treesitter parsers: " .. tostring(err) }
+    end
+    local ok_list, installed = pcall(ts.get_installed, "parsers")
+    if not ok_list then
+      return {}
+    end
+    local missing = vim.tbl_filter(function(lang)
+      return not vim.list_contains(installed, lang)
+    end, M.treesitter_parsers)
+    if #missing > 0 then
+      return {
+        "treesitter parsers failed to build: "
+          .. table.concat(missing, ", ")
+          .. " (needs a C compiler and the tree-sitter CLI)",
+      }
+    end
+    return {}
   end
 
   if vim.fn.exists ":TSInstallSync" == 2 then

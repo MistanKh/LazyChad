@@ -74,12 +74,35 @@ local builtins = {
   },
 }
 
+-- Builtins that a default toolchain doesn't always ship: only treat them as
+-- builtin when they actually run (rustup's rust-analyzer proxy exists but
+-- errors until `rustup component add rust-analyzer`), otherwise Mason installs.
+local probe = {
+  rust_analyzer = { "rust-analyzer", "--version" },
+}
+local probe_cache = {}
+
+local function builtin_runs(name)
+  local cmd = probe[name]
+  if not cmd then
+    return true
+  end
+  if probe_cache[name] == nil then
+    local ok, res = pcall(function()
+      return vim.system(cmd, { text = true }):wait(5000)
+    end)
+    probe_cache[name] = ok and res and res.code == 0 or false
+  end
+  return probe_cache[name]
+end
+
 function M.get_builtins(ft, category)
   local cat = builtins[category]
   if not cat then
     return {}
   end
-  return cat[ft:match "^([^%.]+)"] or cat[ft] or {}
+  local list = cat[ft:match "^([^%.]+)"] or cat[ft] or {}
+  return vim.tbl_filter(builtin_runs, list)
 end
 
 function M.get_recommendation(ft, category)
@@ -163,6 +186,8 @@ function M.get_mason_candidates(ft, category)
 end
 
 function M.package_name_by_bin(bin_name)
+  -- Tools may resolve to an absolute path (e.g. <project>/node_modules/.bin/prettier)
+  bin_name = vim.fs.basename(bin_name)
   local registry_ok, registry = pcall(require, "mason-registry")
   if not registry_ok then
     return bin_name

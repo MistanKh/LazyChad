@@ -5,3 +5,9 @@ vim.g.lspconfig_silence_deprecation = true
 pcall(function()
   require("nvchad.configs.lspconfig").defaults()
 end)
+
+-- defaults() enables lua_ls unconditionally; honour a different :LspPick
+-- choice for Lua (another server, or None).
+pcall(function()
+  require("configs.lsp_picker").apply_lua_choice()
+end)

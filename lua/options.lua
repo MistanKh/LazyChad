@@ -1,9 +1,11 @@
 require "nvchad.options"
 
 -- Language providers: LazyChad uses the Python and Node providers only.
--- Disable Ruby/Perl so `:checkhealth` stays green instead of warning about
--- toolchains we don't ship. (Node: private npm prefix below; Python: distro pynvim package —
--- both handled by `lazychad-deps`.)
+-- nvchad.options disables all of them, so re-enable Python and Node (installed
+-- by `lazychad-deps`: distro pynvim, and the private npm prefix below) and keep
+-- Ruby/Perl off so `:checkhealth` doesn't warn about toolchains we don't ship.
+vim.g.loaded_python3_provider = nil
+vim.g.loaded_node_provider = nil
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_perl_provider = 0
 

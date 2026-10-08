@@ -20,10 +20,39 @@ local function save_state()
   utils.write_json(state_path, load_state())
 end
 
+-- Mason package names that conform knows under another name. conform's
+-- "ruff" is the old alias of ruff_fix (`ruff check --fix`), not a formatter.
+local aliases = { ruff = "ruff_format" }
+
 local function set_formatter(ft, formatter)
   local ok, conform = pcall(require, "conform")
   if ok then
-    conform.formatters_by_ft[ft] = { formatter }
+    -- An empty list (not nil) disables it, so NvChad's defaults (lua = stylua)
+    -- can't come back for that filetype.
+    conform.formatters_by_ft[ft] = formatter and { formatter } or {}
+  end
+end
+
+-- The name conform knows a Mason formatter by, or nil if conform has none.
+-- get_formatter_info() returns { error = true } for unknown names.
+local function conform_name(conform, c, builtin_formatters)
+  local names = {}
+  if aliases[c] then
+    names[#names + 1] = aliases[c]
+  end
+  names[#names + 1] = c
+  local underscored = c:gsub("%-", "_")
+  if underscored ~= c then
+    names[#names + 1] = underscored
+  end
+  for _, n in ipairs(names) do
+    local info = conform.get_formatter_info(n)
+    if info and not info.error then
+      return n
+    end
+  end
+  if vim.list_contains(builtin_formatters, c) then
+    return c
   end
 end
 
@@ -61,31 +90,15 @@ function M.choose_for_filetype(ft, priority_delay)
 
       local valid = {}
       if ok_conform then
-        valid = vim
-          .iter(candidates)
-          :filter(function(c)
-            local info = conform.get_formatter_info(c)
-            local info_alt = not (info and info.command) and conform.get_formatter_info((c:gsub("%-", "_"))) or nil
-
-            local tool = (info and info.command) and c or (info_alt and info_alt.command and c:gsub("%-", "_") or nil)
-            if not tool and vim.list_contains(builtin_formatters, c) then
-              tool = c
-            end
-
-            if tool and not seen[tool] then
-              seen[tool] = true
-              return true
-            end
-            return false
-          end)
-          :map(function(c)
-            local info = conform.get_formatter_info(c)
-            local tool = (info and info.command) and c or c:gsub("%-", "_")
+        for _, c in ipairs(candidates) do
+          local tool = conform_name(conform, c, builtin_formatters)
+          if tool and not seen[tool] then
+            seen[tool] = true
             local label = tool == recommended and (tool .. " (Recommended)") or tool
             display_map[label] = tool
-            return label
-          end)
-          :totable()
+            valid[#valid + 1] = label
+          end
+        end
       end
 
       if #valid == 0 then
@@ -138,11 +151,11 @@ function M.choose_for_filetype(ft, priority_delay)
             end)
           end
         else
-          local ok, c = pcall(require, "conform")
-          if ok then
-            c.formatters_by_ft[ft] = nil
-          end
-          vim.notify("LazyChad: Formatter disabled for " .. ft, vim.log.levels.INFO)
+          set_formatter(ft, nil)
+          vim.notify(
+            "LazyChad: Formatter disabled for " .. ft .. " (including LSP format on save)",
+            vim.log.levels.INFO
+          )
         end
       end)
     end
@@ -181,7 +194,18 @@ function M.setup()
 
     local saved = get_saved_choice(ft)
     if saved == none_choice then
+      vim.schedule(function()
+        set_formatter(ft, nil)
+      end)
       return
+    end
+
+    if saved and aliases[saved] then
+      -- migrate choices saved under the Mason name (e.g. ruff -> ruff_format)
+      saved = aliases[saved]
+      local current = load_state()
+      current.filetypes[ft] = saved
+      save_state()
     end
 
     if saved and saved ~= "" then
@@ -194,6 +218,13 @@ function M.setup()
         if reg.has_package(pkg_name) and reg.get_package(pkg_name):is_installed() then
           is_installed = true
         end
+      end
+      -- Also accept a formatter conform can already run (project-local
+      -- node_modules/.bin/prettier, a system package, ...)
+      if not is_installed then
+        local ok_conform, conform = pcall(require, "conform")
+        local info = ok_conform and conform.get_formatter_info(saved)
+        is_installed = info and info.available or false
       end
 
       if is_installed then

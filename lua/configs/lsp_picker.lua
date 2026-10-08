@@ -108,52 +108,80 @@ local function package_name_for(server)
   return server
 end
 
+local function load_lspconfig()
+  -- Puts nvim-lspconfig's lsp/<server>.lua on the runtimepath and runs its
+  -- config (NvChad's defaults()).
+  local ok, lazy = pcall(require, "lazy")
+  if ok then
+    pcall(lazy.load, { plugins = { "nvim-lspconfig" } })
+  end
+end
+
 local function setup_server(server)
   if setup_servers[server] then
     return
   end
+  load_lspconfig()
+
+  -- Neovim 0.11+: the server's own lsp/<server>.lua (with its on_attach /
+  -- on_init) plus NvChad's vim.lsp.config("*", ...) defaults and LspAttach
+  -- on_attach already apply. Passing on_attach/on_init here would replace the
+  -- server's handlers (vue_ls forwarding, pyright/ts_ls commands, ...).
+  if vim.lsp.config and vim.lsp.enable then
+    vim.lsp.enable(server)
+    setup_servers[server] = true
+    return
+  end
+
+  -- Neovim 0.10 fallback: legacy lspconfig setup
   local ok_lsp, lspconfig = pcall(require, "lspconfig")
-  if not ok_lsp then
-    return
-  end
-
   local ok_nv, nv_lsp = pcall(require, "nvchad.configs.lspconfig")
-  if not ok_nv then
+  if not ok_lsp or not ok_nv then
     return
   end
-
-  local on_attach = nv_lsp.on_attach
-  local on_init = nv_lsp.on_init
-  local capabilities = nv_lsp.capabilities
-
-  -- Check if the new Neovim 0.11+ API is available
-  -- vim.lsp.config[server] returns a resolved copy, so extend the config via
-  -- vim.lsp.config() instead of mutating that table
-  if vim.lsp.config then
-    if vim.lsp.config[server] then
-      vim.lsp.config(server, {
-        on_attach = on_attach,
-        on_init = on_init,
-        capabilities = capabilities,
-      })
-      vim.lsp.enable(server)
-      setup_servers[server] = true
-      return
-    end
-  end
-
   local config = lspconfig[server]
   if config then
     config.setup {
-      on_attach = on_attach,
-      on_init = on_init,
-      capabilities = capabilities,
+      on_attach = nv_lsp.on_attach,
+      on_init = nv_lsp.on_init,
+      capabilities = nv_lsp.capabilities,
       root_dir = function(fname)
         return vim.fs.root(fname, ".git") or vim.uv.cwd()
       end,
     }
     setup_servers[server] = true
   end
+end
+
+-- Stop a server that is no longer chosen for any filetype (servers such as
+-- ts_ls serve several filetypes, so only disable it when nothing uses it).
+local function release_server(server, state_tbl)
+  if not server or server == none_choice or not (vim.lsp.config and vim.lsp.enable) then
+    return
+  end
+  for _, chosen in pairs(state_tbl.filetypes) do
+    if chosen == server then
+      return
+    end
+  end
+  pcall(vim.lsp.enable, server, false)
+  setup_servers[server] = nil
+end
+
+-- NvChad's defaults() always enables lua_ls; respect a different Lua choice.
+function M.apply_lua_choice()
+  local choice = (load_state().filetypes or {}).lua
+  if choice and choice ~= "lua_ls" and vim.lsp.enable then
+    pcall(vim.lsp.enable, "lua_ls", false)
+  end
+end
+
+local function server_executable(server)
+  local ok, cfg = pcall(function()
+    return vim.lsp.config and vim.lsp.config[server]
+  end)
+  local cmd = ok and cfg and cfg.cmd
+  return type(cmd) == "table" and type(cmd[1]) == "string" and vim.fn.executable(cmd[1]) == 1
 end
 
 function M.choose_for_filetype(ft, priority_delay)
@@ -228,8 +256,15 @@ function M.choose_for_filetype(ft, priority_delay)
 
         local server = display_map[choice] or choice
         local current = load_state()
+        local previous = current.filetypes[ft]
         current.filetypes[ft] = (server == "None") and none_choice or server
         save_state()
+        if previous ~= current.filetypes[ft] then
+          release_server(previous, current)
+        end
+        if ft == "lua" then
+          M.apply_lua_choice()
+        end
 
         if server ~= "None" then
           if vim.list_contains(builtin_lsps, server) then
@@ -290,6 +325,11 @@ function M.setup()
         if registry.has_package(pkg_name) and registry.get_package(pkg_name):is_installed() then
           is_installed = true
         end
+      end
+      -- Also accept a server already on PATH (system package, rustup, ...)
+      if not is_installed then
+        load_lspconfig()
+        is_installed = server_executable(saved)
       end
 
       if is_installed then

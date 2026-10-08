@@ -28,6 +28,25 @@ local function set_linter(ft, linter)
   end
 end
 
+-- The command nvim-lint will run for a linter, or nil.
+local function linter_cmd(linter)
+  local ok, lint = pcall(require, "lint")
+  local spec = ok and lint.linters[linter]
+  if not spec then
+    return nil
+  end
+  if type(spec) == "function" then
+    local ok_spec, resolved = pcall(spec)
+    spec = ok_spec and resolved or nil
+  end
+  local cmd = type(spec) == "table" and spec.cmd or nil
+  if type(cmd) == "function" then
+    local ok_cmd, resolved = pcall(cmd)
+    cmd = ok_cmd and resolved or nil
+  end
+  return type(cmd) == "string" and cmd or nil
+end
+
 local function package_name_for(linter)
   local ok, lint = pcall(require, "lint")
   if not ok then
@@ -207,6 +226,12 @@ function M.setup()
         if reg.has_package(pkg_name) and reg.get_package(pkg_name):is_installed() then
           is_installed = true
         end
+      end
+      -- Also accept a linter that already runs (project-local
+      -- node_modules/.bin/eslint_d, a system package, ...)
+      if not is_installed then
+        local cmd = linter_cmd(saved)
+        is_installed = cmd ~= nil and vim.fn.executable(cmd) == 1
       end
 
       if is_installed then

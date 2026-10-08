@@ -80,9 +80,10 @@ local function run_next()
     vim.schedule(run_next)
   end
 
-  -- Ensure we cleanup and run next if buffer is closed by other means
-  vim.api.nvim_create_autocmd("BufDelete", {
-    buffer = buf,
+  -- Ensure we cleanup and run next if the window is closed by other means
+  -- (:q, <C-w>c). BufDelete never fires for this unlisted scratch buffer.
+  vim.api.nvim_create_autocmd("WinClosed", {
+    pattern = tostring(win),
     once = true,
     callback = function()
       if not finished then
