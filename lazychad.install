@@ -12,10 +12,9 @@ post_upgrade() {
 
 post_remove() {
   # Packages shouldn't delete users' files; lazychad-uninstall does a full cleanup.
-  echo "==> LazyChad removed. Your config and plugins were kept:"
+  echo "==> LazyChad removed. Each user's config and plugins are kept in:"
   echo "      ~/.config/LazyChad  ~/.local/share/LazyChad  ~/.local/state/LazyChad  ~/.cache/LazyChad"
-  echo "==> Delete them with 'rm -rf' on those paths if you no longer need them."
-  echo "==> Neovim installed via 'lazychad-nvim' under /usr/local is NOT removed."
-  echo "==>   Run 'lazychad-nvim --uninstall' (before removing) or delete /usr/local/bin/nvim,"
-  echo "==>   /usr/local/lib/nvim and /usr/local/share/nvim."
+  echo "==> To delete them: rm -rf ~/.config/LazyChad ~/.local/share/LazyChad ~/.local/state/LazyChad ~/.cache/LazyChad"
+  echo "==> Neovim installed by lazychad-nvim under /usr/local was not removed. To remove it:"
+  echo "      sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim /usr/local/share/applications/nvim.desktop /usr/local/share/man/man1/nvim.1"
 }

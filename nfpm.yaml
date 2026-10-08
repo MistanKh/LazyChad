@@ -40,11 +40,16 @@ contents:
     dst: /usr/share/licenses/lazychad/LICENSE
 
 scripts:
-  # Using the existing logic for user-side cleanup if desired
-  # but native packages usually don't touch home dirs.
-  # We'll stick to a simple post-install notification for now.
+  # preinstall/postinstall (deb) and rpm posttrans protect user data from the
+  # wiping postrm/%postun of LazyChad <= 1.0.9 during upgrades. postremove only
+  # deletes user data on `apt purge`. All of these run under /bin/sh on rpm.
+  preinstall: ./scripts/linux-preinstall.sh
   postinstall: ./scripts/linux-postinstall.sh
   postremove: ./scripts/linux-postremove.sh
+
+rpm:
+  scripts:
+    posttrans: ./scripts/linux-posttrans.sh
 
 # Dependencies that exist across Arch, Debian, and Fedora
 depends:
