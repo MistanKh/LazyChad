@@ -194,11 +194,15 @@ install_tarball() {
         rm -rf "$tmp"; return 1
     fi
 
+    # Extract to a staging dir first, so a failure leaves the old install intact.
+    mkdir -p "$tmp/stage"
+    if ! tar -xzf "$tmp/$asset.tar.gz" -C "$tmp/stage" --strip-components=1; then rm -rf "$tmp"; return 1; fi
     # Clear the previous tarball's runtime so files from another version
-    # (e.g. nightly -> stable) can't be sourced at startup.
+    # (e.g. nightly -> stable) can't be sourced at startup. share/nvim/site
+    # is shared with other tools and is left alone.
     sudo rm -rf /usr/local/share/nvim/runtime /usr/local/lib/nvim
-    echo -e "${BLUE}Extracting to /usr/local...${NC}"
-    if ! sudo tar -xzf "$tmp/$asset.tar.gz" -C /usr/local --strip-components=1; then rm -rf "$tmp"; return 1; fi
+    echo -e "${BLUE}Installing to /usr/local...${NC}"
+    if ! sudo cp -a --no-preserve=ownership "$tmp/stage"/. /usr/local/; then rm -rf "$tmp"; return 1; fi
     rm -rf "$tmp"
     return 0
 }
@@ -281,12 +285,28 @@ install_or_update() {
     fi
 }
 
+nvim_tarball_paths() {
+    # Everything the official Neovim tarball puts under /usr/local (kept in
+    # sync with lazychad-uninstall; tests compare the two).
+    local p
+    for p in /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim/runtime \
+             /usr/local/share/applications/nvim.desktop /usr/local/share/man/man1/nvim.1 \
+             /usr/local/share/icons/hicolor/*/apps/nvim.png \
+             /usr/local/share/locale/*/LC_MESSAGES/nvim.mo /usr/local/nvim; do
+        { [ -e "$p" ] || [ -L "$p" ]; } && echo "$p"
+    done
+    return 0
+}
+
 uninstall_nvim() {
+    local paths=()
     echo -e "${BLUE}Removing Neovim installed under /usr/local...${NC}"
-    if ! sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim; then
+    mapfile -t paths < <(nvim_tarball_paths)
+    if [ "${#paths[@]}" -gt 0 ] && ! sudo rm -rf -- "${paths[@]}"; then
         echo -e "${RED}⚠️ Failed to remove some /usr/local Neovim files (permissions?).${NC}"
         return 1
     fi
+    sudo rmdir /usr/local/share/nvim 2>/dev/null || true
     cleanup_manual
     echo -e "${GREEN}✅ Neovim (tarball/manual install) removed.${NC}"
     echo -e "${YELLOW}Any apt/pacman 'neovim' package was left untouched.${NC}"
@@ -301,9 +321,9 @@ Usage: lazychad-nvim [action] [--stable|--nightly]
 Actions:
   (none), install, --install, -i   Install or update Neovim (default)
   update, --update, -u             Same as install
-  --uninstall, -r                  Remove the /usr/local Neovim install
-  --cleanup, -c                    Remove leftover manual-install files
-  --help, -h                       Show this help
+  uninstall, --uninstall, -r       Remove the /usr/local Neovim install
+  cleanup, --cleanup, -c           Remove leftover manual-install files
+  help, --help, -h                 Show this help
 
 Channels:
   --stable    Install the latest stable release (DEFAULT; LazyChad needs 0.12+)
@@ -321,11 +341,14 @@ main() {
         case "$1" in
             --stable)                                 NVIM_CHANNEL="stable" ;;
             --nightly)                                NVIM_CHANNEL="nightly" ;;
-            -r|--uninstall)                           action="uninstall" ;;
-            -c|--cleanup)                             action="cleanup" ;;
-            -h|--help)                                action="help" ;;
+            -r|--uninstall|uninstall|remove)          action="uninstall" ;;
+            -c|--cleanup|cleanup)                     action="cleanup" ;;
+            -h|--help|help)                           action="help" ;;
             -i|--install|-u|--update|install|update)  action="install" ;;
-            *)                                        action="install" ;;
+            *)
+                echo -e "${RED}Unknown option: $1${NC}" >&2
+                usage >&2
+                return 2 ;;
         esac
         shift
     done

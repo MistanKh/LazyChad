@@ -62,17 +62,30 @@ copy_system_config() {
     chmod -R u+rw "$LAZYCHAD_DIR"
 }
 
+restore_upgrade_stash() {
+    # The package's pre-install hook moves these aside during an upgrade and its
+    # post-install hook moves them back. If that was interrupted, finish it here.
+    local sub dir
+    for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
+        dir="$HOME/$sub"
+        if [ -d "$dir.pkg-upgrade" ] && [ ! -e "$dir" ]; then
+            mv "$dir.pkg-upgrade" "$dir" && echo "♻️  Restored $dir after an interrupted package upgrade." >&2
+        fi
+    done
+}
+
 seed_config() {
     # First-time setup, or offer a refresh when the packaged version changed.
+    restore_upgrade_stash
     if [ ! -f "$LAZYCHAD_DIR/init.lua" ]; then
         if [ -d "$SYSTEM_DIR" ]; then
-            echo "📦 Initializing LazyChad configuration from $SYSTEM_DIR..."
+            echo "📦 Initializing LazyChad configuration from $SYSTEM_DIR..." >&2
             copy_system_config
             return 0
         fi
-        echo -e "${RED}❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR${NC}"
-        echo "If you installed manually, please clone the repository there:"
-        echo "git clone https://github.com/MistanKh/LazyChad $LAZYCHAD_DIR"
+        echo -e "${RED}❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR${NC}" >&2
+        echo "If you installed manually, please clone the repository there:" >&2
+        echo "git clone https://github.com/MistanKh/LazyChad $LAZYCHAD_DIR" >&2
         return 1
     fi
 
@@ -82,28 +95,28 @@ seed_config() {
     user_ver="$(tr -d '[:space:]' 2>/dev/null < "$LAZYCHAD_DIR/.version" || echo "0.0.0")"
     [ "$sys_ver" = "$user_ver" ] && return 0
 
-    echo -e "${YELLOW}🔔 System update detected (v$user_ver -> v$sys_ver)!${NC}"
+    echo -e "${YELLOW}🔔 System update detected (v$user_ver -> v$sys_ver)!${NC}" >&2
     if ! is_tty; then
-        echo "Run 'lchad' in a terminal to refresh your local configuration."
+        echo "Run 'lchad' in a terminal to refresh your local configuration." >&2
         return 0
     fi
-    echo "Your local configuration is out of date."
+    echo "Your local configuration is out of date." >&2
     read -p "Do you want to refresh your local configuration? (y/N) " -n 1 -r
-    echo
+    echo >&2
     if [[ $REPLY =~ ^[Yy]$ ]]; then
         backup="${LAZYCHAD_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
-        echo "🗄️ Backing up current config to $backup..."
+        echo "🗄️ Backing up current config to $backup..." >&2
         mv "$LAZYCHAD_DIR" "$backup"
-        echo "📦 Syncing new version v$sys_ver..."
+        echo "📦 Syncing new version v$sys_ver..." >&2
         copy_system_config
-        echo "✅ Sync complete. You can find your old files in $backup"
+        echo "✅ Sync complete. You can find your old files in $backup" >&2
     fi
 }
 
 run_setup() {
     local deps
     if ! deps="$(find_helper lazychad-deps)"; then
-        echo -e "${RED}❌ lazychad-deps not found.${NC}"
+        echo -e "${RED}❌ lazychad-deps not found.${NC}" >&2
         return 1
     fi
     "$deps" "$@"
@@ -111,14 +124,14 @@ run_setup() {
 
 ensure_nvim() {
     command -v nvim >/dev/null 2>&1 && return 0
-    echo -e "${RED}❌ Neovim is not installed (or not on your PATH).${NC}"
+    echo -e "${RED}❌ Neovim is not installed (or not on your PATH).${NC}" >&2
     if is_tty && confirm_yes "Run 'lazychad-deps' now to install Neovim 0.12+ and the tools LazyChad needs?"; then
         run_setup
         hash -r
         command -v nvim >/dev/null 2>&1 && return 0
     fi
-    echo "Run 'lazychad-deps' to install Neovim 0.12+ and the providers,"
-    echo "or 'lazychad-nvim' to install just Neovim."
+    echo "Run 'lazychad-deps' to install Neovim 0.12+ and the providers," >&2
+    echo "or 'lazychad-nvim' to install just Neovim." >&2
     return 1
 }
 
@@ -126,19 +139,35 @@ plugins_installed() {
     [ -d "$LAZYCHAD_DATA/lazy/lazy.nvim" ] && [ -d "$LAZYCHAD_DATA/lazy/NvChad" ]
 }
 
+bootstrap_lua() {
+    # The user's config may predate configs/bootstrap.lua (declined refresh,
+    # AUR upgrade); fall back to the packaged copy.
+    local f
+    for f in "$LAZYCHAD_DIR/lua/configs/bootstrap.lua" "$SYSTEM_DIR/lua/configs/bootstrap.lua"; do
+        [ -f "$f" ] && { echo "$f"; return 0; }
+    done
+    return 1
+}
+
 run_bootstrap() {
-    echo -e "${BLUE}📦 Installing LazyChad plugins (one-time setup)...${NC}"
-    if ! nvim --headless "+Lazy! sync" +qa; then
-        echo -e "${RED}⚠️ Plugin install failed (network?). Re-run 'lchad --bootstrap'.${NC}"
+    local lua_file
+    echo -e "${BLUE}📦 Installing LazyChad plugins (one-time setup)...${NC}" >&2
+    # Every headless call ends with a quit, so an error can never leave it hanging.
+    if ! nvim --headless "+Lazy! sync" "+qa"; then
+        echo -e "${RED}⚠️ Plugin install failed (network?). Re-run 'lchad --bootstrap'.${NC}" >&2
         return 1
     fi
-    echo
-    echo -e "${BLUE}🧰 Installing language tools and parsers...${NC}"
-    if ! nvim --headless "+lua require('configs.bootstrap').run()"; then
-        echo -e "${YELLOW}⚠️ Some tools could not be installed. Re-run 'lchad --bootstrap' or check :Mason.${NC}"
+    echo >&2
+    if ! lua_file="$(bootstrap_lua)"; then
+        echo -e "${YELLOW}⚠️ Your config has no bootstrap step; run 'lchad' and accept the refresh.${NC}" >&2
         return 1
     fi
-    echo -e "${GREEN}✅ LazyChad is ready.${NC}"
+    echo -e "${BLUE}🧰 Installing language tools and parsers...${NC}" >&2
+    if ! nvim --headless "+lua dofile([[$lua_file]]).run()" "+cquit 1"; then
+        echo -e "${YELLOW}⚠️ Some tools could not be installed. Re-run 'lchad --bootstrap' or check :Mason.${NC}" >&2
+        return 1
+    fi
+    echo -e "${GREEN}✅ LazyChad is ready.${NC}" >&2
 }
 
 # ---- doctor ----
@@ -282,11 +311,11 @@ main() {
     local v
     v="$(nvim_version)"
     if ! version_ok "$v"; then
-        echo -e "${YELLOW}⚠️  Neovim ${v:-unknown} detected, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}"
-        echo -e "${YELLOW}    Run 'lazychad-nvim' to install the latest stable Neovim. Continuing anyway...${NC}"
+        echo -e "${YELLOW}⚠️  Neovim ${v:-unknown} detected, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}" >&2
+        echo -e "${YELLOW}    Run 'lazychad-nvim' to install the latest stable Neovim. Continuing anyway...${NC}" >&2
     elif ! plugins_installed && is_tty; then
         # First launch: install everything up front, so the editor opens ready.
-        run_bootstrap || echo -e "${YELLOW}Continuing; lazy.nvim will retry on launch.${NC}"
+        run_bootstrap || echo -e "${YELLOW}Continuing; lazy.nvim will retry on launch.${NC}" >&2
     fi
 
     # Run Neovim and pass all arguments ($@)

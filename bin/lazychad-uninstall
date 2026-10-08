@@ -1,11 +1,12 @@
 #!/bin/bash
 # LazyChad Uninstaller — full, install-method-aware removal.
-# Removes the /usr/local Neovim install, LazyChad binaries/files, and user
-# dirs. Leaves shared deps (Node, Rust, Neovide, fonts) untouched.
-# Confirms and offers a config backup first. Run as a normal user; uses sudo.
+# Removes the LazyChad package (or manual install), the /usr/local Neovim
+# install, and user dirs, in that order; a failed package removal stops it
+# before anything else is touched. Leaves shared deps (Node, Rust, Neovide,
+# fonts) untouched. Confirms and offers a config backup first. Run as a normal
+# user; uses sudo.
 
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 parse_yes() {
     case "${1:-}" in
@@ -22,7 +23,7 @@ confirm() {
 }
 
 backup_user_config() {
-    local cfg="$HOME/.config/LazyChad"
+    local cfg="${XDG_CONFIG_HOME:-$HOME/.config}/LazyChad"
     if [ -d "$cfg" ] && confirm "Back up $cfg before removing?"; then
         local dest
         dest="${cfg}_backup_$(date +%Y%m%d_%H%M%S)"
@@ -31,58 +32,93 @@ backup_user_config() {
     fi
 }
 
-remove_user_dirs() {
-    local home sub
-    for home in /home/* /root; do
+user_dirs() {
+    # Every user's LazyChad dirs, plus this user's XDG locations if they differ.
+    local home sub var val
+    for home in ${LAZYCHAD_HOMES:-/home/* /root}; do
         [ -d "$home" ] || continue
         for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
-            if [ -d "$home/$sub" ]; then
-                sudo rm -rf "${home:?}/$sub"
-                echo "  -> removed $home/$sub"
-            fi
+            [ -d "$home/$sub" ] && echo "$home/$sub"
         done
     done
+    for var in XDG_CONFIG_HOME XDG_DATA_HOME XDG_STATE_HOME XDG_CACHE_HOME; do
+        val="${!var:-}"
+        [ -n "$val" ] && [ -d "$val/LazyChad" ] && echo "$val/LazyChad"
+    done
+    return 0
+}
+
+remove_user_dirs() {
+    local dir
+    while IFS= read -r dir; do
+        [ -n "$dir" ] || continue
+        sudo rm -rf -- "${dir:?}"
+        echo "  -> removed $dir"
+    done < <(user_dirs | sort -u)
+}
+
+nvim_tarball_paths() {
+    # Everything the official Neovim tarball puts under /usr/local (kept in
+    # sync with lazychad-nvim; tests compare the two).
+    local p
+    for p in /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim/runtime \
+             /usr/local/share/applications/nvim.desktop /usr/local/share/man/man1/nvim.1 \
+             /usr/local/share/icons/hicolor/*/apps/nvim.png \
+             /usr/local/share/locale/*/LC_MESSAGES/nvim.mo /usr/local/nvim; do
+        { [ -e "$p" ] || [ -L "$p" ]; } && echo "$p"
+    done
+    return 0
 }
 
 remove_neovim() {
-    local installer=""
-    if command -v lazychad-nvim >/dev/null 2>&1; then
-        installer="lazychad-nvim"
-    elif [ -x "$SCRIPT_DIR/lazychad-nvim" ]; then
-        installer="$SCRIPT_DIR/lazychad-nvim"
+    local paths=()
+    mapfile -t paths < <(nvim_tarball_paths)
+    if [ "${#paths[@]}" -eq 0 ]; then
+        echo "No Neovim install under /usr/local."
+        return 0
     fi
-    if [ -n "$installer" ]; then
-        "$installer" --uninstall || echo -e "${RED}⚠️ Neovim removal reported a problem; continuing.${NC}"
+    echo -e "${BLUE}Removing Neovim under /usr/local...${NC}"
+    sudo rm -rf -- "${paths[@]}" || echo -e "${RED}⚠️ Some /usr/local Neovim files could not be removed.${NC}"
+    sudo rmdir /usr/local/share/nvim 2>/dev/null || true
+}
+
+detect_install() {
+    if command -v dpkg >/dev/null 2>&1 && dpkg -S /usr/bin/lchad >/dev/null 2>&1; then
+        echo dpkg
+    elif command -v pacman >/dev/null 2>&1 && pacman -Qo /usr/bin/lchad >/dev/null 2>&1; then
+        echo pacman
+    elif command -v rpm >/dev/null 2>&1 && rpm -qf /usr/bin/lchad >/dev/null 2>&1; then
+        echo rpm
     else
-        echo -e "${BLUE}Removing Neovim under /usr/local directly...${NC}"
-        sudo rm -rf /usr/local/bin/nvim /usr/local/lib/nvim /usr/local/share/nvim /usr/local/nvim
+        echo manual
     fi
 }
 
-remove_lazychad() {
-    if command -v dpkg >/dev/null 2>&1 && dpkg -S /usr/bin/lchad >/dev/null 2>&1; then
-        echo -e "${BLUE}Detected dpkg install. Removing the lazychad package...${NC}"
-        sudo apt-get remove -y lazychad
-    elif command -v pacman >/dev/null 2>&1 && pacman -Qo /usr/bin/lchad >/dev/null 2>&1; then
-        echo -e "${BLUE}Detected pacman install. Removing the lazychad package...${NC}"
-        sudo pacman -R --noconfirm lazychad
-    elif command -v rpm >/dev/null 2>&1 && rpm -qf /usr/bin/lchad >/dev/null 2>&1; then
-        echo -e "${BLUE}Detected rpm install. Removing the lazychad package...${NC}"
-        if command -v dnf >/dev/null 2>&1; then
-            sudo dnf remove -y lazychad
-        elif command -v zypper >/dev/null 2>&1; then
-            sudo zypper remove -y lazychad
-        else
-            sudo rpm -e lazychad
-        fi
-    else
-        echo -e "${BLUE}Removing manual LazyChad install...${NC}"
-        sudo rm -f /usr/bin/lchad /usr/bin/lazychad-deps /usr/bin/lazychad-nvim /usr/bin/lazychad-uninstall
-        sudo rm -rf /usr/share/lazychad /usr/share/doc/lazychad /usr/share/licenses/lazychad
-    fi
-    # Belt-and-suspenders: package postremove hooks usually clear user dirs,
-    # but run this unconditionally so nothing is left behind on any install type.
-    remove_user_dirs
+remove_lazychad_package() {
+    # Returns the package manager's status, so a failure stops the uninstall.
+    case "$(detect_install)" in
+        dpkg)
+            # purge, not remove: a removed-but-not-purged package keeps its
+            # postrm armed, and a later purge would wipe data again.
+            echo -e "${BLUE}Detected dpkg install. Purging the lazychad package...${NC}"
+            sudo apt-get purge -y lazychad ;;
+        pacman)
+            echo -e "${BLUE}Detected pacman install. Removing the lazychad package...${NC}"
+            sudo pacman -R --noconfirm lazychad ;;
+        rpm)
+            echo -e "${BLUE}Detected rpm install. Removing the lazychad package...${NC}"
+            if command -v dnf >/dev/null 2>&1; then
+                sudo dnf remove -y lazychad
+            elif command -v zypper >/dev/null 2>&1; then
+                sudo zypper remove -y lazychad
+            else
+                sudo rpm -e lazychad
+            fi ;;
+        manual)
+            echo -e "${BLUE}Removing manual LazyChad install...${NC}"
+            sudo rm -f /usr/bin/lchad /usr/bin/lazychad-deps /usr/bin/lazychad-nvim /usr/bin/lazychad-uninstall \
+                && sudo rm -rf /usr/share/lazychad /usr/share/doc/lazychad /usr/share/licenses/lazychad ;;
+    esac
 }
 
 main() {
@@ -90,10 +126,10 @@ main() {
 
     echo -e "${BOLD}=== LazyChad Uninstaller ===${NC}"
     echo "The following will be removed:"
-    echo "  - Neovim installed under /usr/local (bin/lib/share/nvim)"
-    echo "  - LazyChad binaries: lchad, lazychad-deps, lazychad-nvim, lazychad-uninstall"
-    echo "  - System files: /usr/share/lazychad, /usr/share/doc/lazychad, /usr/share/licenses/lazychad"
-    echo "  - User dirs: ~/.config/LazyChad and ~/.local/share|state, ~/.cache/LazyChad (all users)"
+    echo "  - The LazyChad package or manual install (lchad, lazychad-deps, lazychad-nvim, lazychad-uninstall)"
+    echo "  - Neovim installed under /usr/local by lazychad-nvim"
+    echo "  - User dirs: ~/.config/LazyChad, ~/.local/share/LazyChad, ~/.local/state/LazyChad,"
+    echo "    ~/.cache/LazyChad (all users)"
     echo -e "${YELLOW}Shared deps (Node, Rust, Neovide, fonts, -dev packages) will NOT be removed.${NC}"
     echo
 
@@ -102,9 +138,14 @@ main() {
         exit 0
     fi
 
-    backup_user_config   # backup BEFORE any package-manager postremove runs
-    remove_neovim        # remove nvim while lazychad-nvim still exists
-    remove_lazychad
+    backup_user_config   # before any package-manager hook runs
+    if ! remove_lazychad_package; then
+        echo -e "${RED}❌ Removing the LazyChad package failed; Neovim and user data were NOT touched.${NC}"
+        echo "   Fix the error above (e.g. another package manager holding the lock) and re-run lazychad-uninstall."
+        exit 1
+    fi
+    remove_neovim
+    remove_user_dirs
 
     echo -e "${GREEN}✅ LazyChad has been uninstalled.${NC}"
 }

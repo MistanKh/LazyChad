@@ -86,4 +86,9 @@ assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" deadbeef && echo yes
 assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "" && echo yes || echo no)" "no" "verify_sha256 rejects empty hash"
 command rm -rf "$tmpd"
 
+# unknown arguments never fall through to an install
+assert_eq "$( (main bogus) >/dev/null 2>&1; echo $?)" "2" "unknown argument exits 2 instead of installing"
+assert_eq "$(install_or_update() { echo INSTALL; }; uninstall_nvim() { echo UNINSTALL; }; main uninstall 2>/dev/null)" "UNINSTALL" \
+  "bare 'uninstall' uninstalls"
+
 exit $fail

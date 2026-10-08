@@ -87,6 +87,14 @@ detect_family() {
     esac
 }
 
+os_release_field() {
+    # $1=field. Read in a subshell so os-release can't clobber our variables.
+    local file="${OS_RELEASE_FILE:-/etc/os-release}"
+    [ -f "$file" ] || return 0
+    # shellcheck source=/dev/null
+    ( . "$file"; eval "printf '%s' \"\${$1:-}\"" )
+}
+
 find_helper() {
     if exists "$1"; then
         command -v "$1"
@@ -136,12 +144,34 @@ install_resilient() {
     fi
 }
 
+pkg_command() {
+    # Command a package provides, so equivalents installed another way (e.g.
+    # NodeSource nodejs bundling npm, nodejs-lts-* on Arch, curl-minimal on
+    # Fedora) count as installed instead of conflicting on every run.
+    case "$1" in
+        nodejs) echo node ;;
+        npm|git|curl|tar|unzip|make|gcc|cmake|luarocks|xclip|python3) echo "$1" ;;
+        python) echo python3 ;;
+        ripgrep) echo rg ;;
+        fd) echo fd ;;
+        fd-find) echo fdfind ;;
+        wl-clipboard) echo wl-copy ;;
+        *) return 1 ;;
+    esac
+}
+
+is_present() {
+    local cmd
+    check_installed "$1" && return 0
+    cmd="$(pkg_command "$1")" && exists "$cmd"
+}
+
 install_missing() {
     # $1=label, rest=packages; installs only the ones not already present
     local label="$1"; shift
     local dep missing=()
     for dep in "$@"; do
-        check_installed "$dep" || missing+=("$dep")
+        is_present "$dep" || missing+=("$dep")
     done
     if [ ${#missing[@]} -gt 0 ]; then
         echo -e "${BLUE}Installing: ${missing[*]}${NC}"
@@ -166,7 +196,8 @@ set_family_packages() {
                 "wl-clipboard" "xclip"
             )
             GUI_DEPS=("neovide")
-            check_installed() { pacman -Q "$1" >/dev/null 2>&1; }
+            # -T resolves provides (nodejs-lts-* satisfies nodejs).
+            check_installed() { pacman -T "$1" >/dev/null 2>&1; }
             ;;
         debian)
             PKG_MANAGER="sudo apt-get install -y"
@@ -188,11 +219,13 @@ set_family_packages() {
                 GUI_DEPS+=("libasound2")
             fi
             NEOVIDE_BUILD_DEPS=(
-                "gcc-multilib" "g++-multilib" "libssl-dev" "pkg-config" "libfreetype6-dev"
+                "libssl-dev" "pkg-config" "libfreetype6-dev"
                 "libasound2-dev" "libexpat1-dev" "libxcb-composite0-dev" "libbz2-dev"
                 "libsndio-dev" "libglut-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
                 "libxcursor-dev"
             )
+            # multilib packages exist (and are needed) only on x86_64.
+            [ "$(uname -m)" = "x86_64" ] && NEOVIDE_BUILD_DEPS+=("gcc-multilib" "g++-multilib")
             # dpkg -l also succeeds for removed-but-not-purged ("rc") packages,
             # so check the real install status instead.
             check_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
@@ -211,7 +244,7 @@ set_family_packages() {
             NEOVIDE_BUILD_DEPS=(
                 "fontconfig-devel" "freetype-devel" "libstdc++-static" "libstdc++-devel"
             )
-            check_installed() { rpm -q "$1" >/dev/null 2>&1; }
+            check_installed() { rpm -q --whatprovides "$1" >/dev/null 2>&1; }
             ;;
         *)
             return 1
@@ -220,7 +253,7 @@ set_family_packages() {
 }
 
 step_neovim() {
-    echo -e "\n${BOLD}${YELLOW}[1/6] Neovim (0.12+)${NC}"
+    echo -e "\n${BOLD}${YELLOW}[2/6] Neovim (0.12+)${NC}"
     if [ "$SKIP_NVIM" = true ]; then
         echo "Skipped (--skip-nvim)."
         return 0
@@ -280,8 +313,20 @@ install_nerd_font() {
     echo -e "${GREEN}✅ JetBrainsMono Nerd Font installed. Select it in your terminal's settings.${NC}"
 }
 
+epel_enabled() {
+    dnf repolist --enabled 2>/dev/null | grep -qi '^epel'
+}
+
 step_system_packages() {
-    echo -e "\n${BOLD}${YELLOW}[2/6] System packages${NC}"
+    echo -e "\n${BOLD}${YELLOW}[1/6] System packages${NC}"
+    if [ "$SUPPORTED" != true ]; then
+        warn_fail "No package list for '$OS_ID': install these yourself: git curl tar unzip make gcc ripgrep fd nodejs npm python3 + pynvim, xclip or wl-clipboard"
+        install_nerd_font
+        return 0
+    fi
+    if [ "$FAMILY" = "fedora" ] && [ "$OS_ID" != "fedora" ] && ! epel_enabled; then
+        warn_fail "EPEL is not enabled; ripgrep, fd-find, pynvim and others come from EPEL on $OS_ID (dnf install epel-release && dnf config-manager --set-enabled crb)"
+    fi
     if [ "$FAMILY" = "debian" ]; then
         sudo apt-get update || warn_fail "apt-get update failed (network?); package install may be incomplete"
     fi
@@ -366,7 +411,7 @@ step_neovide() {
         return 0
     fi
 
-    install_missing "Neovide runtime libraries" "${GUI_DEPS[@]}"
+    [ "$SUPPORTED" = true ] && install_missing "Neovide runtime libraries" "${GUI_DEPS[@]}"
     [ "$FAMILY" = "arch" ] && return 0
 
     # Prefer the official prebuilt x86_64 binary (fast, no compile). Fall back
@@ -391,7 +436,7 @@ step_neovide() {
         warn_fail "Rust install failed; can't build Neovide"
         return 0
     fi
-    install_resilient "Neovide build deps" "${NEOVIDE_BUILD_DEPS[@]}"
+    [ "$SUPPORTED" = true ] && install_resilient "Neovide build deps" "${NEOVIDE_BUILD_DEPS[@]}"
     echo -e "${BLUE}Building Neovide from source (this may take a few minutes)...${NC}"
     cargo install --git https://github.com/neovide/neovide.git \
         || warn_fail "Neovide build from source failed"
@@ -450,23 +495,22 @@ main() {
 
     echo -e "${BOLD}${BLUE}🚀 LazyChad Dependency Installer${NC}"
 
-    local ID="" ID_LIKE="" NAME=""
-    if [ -f /etc/os-release ]; then
-        # shellcheck source=/dev/null
-        . /etc/os-release
-    else
-        ID="$(uname -s | tr '[:upper:]' '[:lower:]')"
-    fi
-    FAMILY="$(detect_family "$ID" "$ID_LIKE")"
-    echo -e "${BOLD}${YELLOW}Detected OS: ${NAME:-$ID} ($ID, family: $FAMILY)${NC}"
+    local os_name
+    OS_ID="$(os_release_field ID)"
+    [ -n "$OS_ID" ] || OS_ID="$(uname -s | tr '[:upper:]' '[:lower:]')"
+    os_name="$(os_release_field NAME)"
+    FAMILY="$(detect_family "$OS_ID" "$(os_release_field ID_LIKE)")"
+    echo -e "${BOLD}${YELLOW}Detected OS: ${os_name:-$OS_ID} ($OS_ID, family: $FAMILY)${NC}"
 
+    SUPPORTED=true
     if ! set_family_packages; then
-        echo -e "${RED}Unsupported OS: $ID (family: $FAMILY). Please install dependencies manually.${NC}"
-        exit 1
+        SUPPORTED=false
+        echo -e "${YELLOW}No package list for $OS_ID; installing what doesn't need your package manager.${NC}"
     fi
 
-    step_neovim
+    # System packages first: the Neovim download needs curl and tar.
     step_system_packages
+    step_neovim
     step_node_tools
     step_python_provider
     step_neovide
