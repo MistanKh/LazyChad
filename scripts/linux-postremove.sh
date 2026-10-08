@@ -1,17 +1,27 @@
 #!/bin/bash
 # Post-removal script for Debian/RPM packages
 #
-# This hook also runs during upgrades: dpkg calls postrm with "upgrade", and
-# RPM runs %postun with $1=1. Only wipe user dirs on a real removal, otherwise
-# every package upgrade would delete ~/.config/LazyChad before lchad can offer
-# its backup-and-sync.
+# Packages shouldn't silently delete users' files: user dirs are only wiped on
+# an explicit `apt purge` (or by `lazychad-uninstall`). This hook also runs on
+# upgrades (dpkg "upgrade", RPM $1=1), where it must never touch them.
 
 should_cleanup() {
     # $1 = dpkg postrm action ("remove", "purge", ...) or RPM install count.
+    [ "${1:-}" = "purge" ]
+}
+
+is_removal() {
     case "${1:-}" in
-        remove|purge|0) return 0 ;;
-        *)              return 1 ;;
+        remove|0) return 0 ;;
+        *)        return 1 ;;
     esac
+}
+
+print_keep_note() {
+    echo "==> LazyChad removed. Your config and plugins were kept:"
+    echo "      ~/.config/LazyChad  ~/.local/share/LazyChad  ~/.local/state/LazyChad  ~/.cache/LazyChad"
+    echo "==> Delete them with 'rm -rf' on those paths, or use 'apt purge lazychad' next time."
+    echo "==> Neovim installed via 'lazychad-nvim' under /usr/local is NOT removed."
 }
 
 cleanup_user_dirs() {
@@ -22,7 +32,7 @@ cleanup_user_dirs() {
         for sub in .config/LazyChad .local/share/LazyChad .local/state/LazyChad .cache/LazyChad; do
             if [ -d "$user_home/$sub" ]; then
                 echo "  -> Removing $user_home/$sub"
-                rm -rf "$user_home/$sub"
+                rm -rf "${user_home:?}/$sub"
             fi
         done
     done
@@ -34,6 +44,8 @@ cleanup_user_dirs() {
 if [ -z "${LAZYCHAD_POSTREMOVE_SOURCED:-}" ]; then
     if should_cleanup "${1:-}"; then
         cleanup_user_dirs
+    elif is_removal "${1:-}"; then
+        print_keep_note
     fi
     exit 0
 fi

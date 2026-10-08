@@ -1,9 +1,13 @@
 name: AUR Sync
 
+# Publishes the PKGBUILD to the AUR when a release tag is pushed, so AUR users
+# get exactly the tagged release (with a real checksum) instead of whatever is
+# on main.
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   aur-sync:
@@ -13,14 +17,22 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          pacman -Syu --noconfirm git base-devel openssh
+          pacman -Syu --noconfirm git base-devel openssh pacman-contrib
 
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Update .SRCINFO and Push to AUR
+      - name: Check version consistency
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            bash scripts/check-version.sh "$GITHUB_REF_NAME"
+          else
+            bash scripts/check-version.sh
+          fi
+
+      - name: Update checksums, .SRCINFO and Push to AUR
         run: |
           set -e
           echo "🔑 Setting up SSH..."
@@ -28,40 +40,46 @@ jobs:
           chmod 700 ~/.ssh
           printf "%s\n" "${{ secrets.AUR_SSH_PRIVATE_KEY }}" > ~/.ssh/id_aur
           chmod 600 ~/.ssh/id_aur
-          
+
           echo "🕵️ Starting SSH Agent..."
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_aur
-          
+
           echo "⚙️ Configuring Git..."
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
           git config --global --add safe.directory '*'
-          
+
           echo "📥 Cloning AUR repo..."
           export GIT_SSH_COMMAND="ssh -o StrictHostKeyChecking=no"
           git clone ssh://aur@aur.archlinux.org/lazychad.git aur-repo
-          
+
           echo "📂 Copying files..."
           cp PKGBUILD aur-repo/
           cp lazychad.install aur-repo/
-          
-          echo "🛠️ Generating .SRCINFO..."
+
           # makepkg cannot be run as root
           id -u builduser >/dev/null 2>&1 || useradd -m builduser
           chown -R builduser:builduser aur-repo
-          
           cd aur-repo
+
+          echo "🔐 Pinning the release tarball checksum..."
+          su builduser -c "updpkgsums"
+
+          echo "📦 Test-building the package..."
+          su builduser -c "makepkg -f --nodeps --noconfirm"
+
+          echo "🛠️ Generating .SRCINFO..."
           su builduser -c "makepkg --printsrcinfo" > .SRCINFO
-          
+
           echo "📤 Committing and Pushing to AUR..."
           chown root:root .SRCINFO PKGBUILD lazychad.install .
           git add PKGBUILD .SRCINFO lazychad.install
-          
+
           if git diff --staged --quiet; then
             echo "✅ No changes to commit"
           else
-            git commit -m "bot: sync from github [${{ github.sha }}]"
+            git commit -m "bot: sync ${GITHUB_REF_NAME} from github [${{ github.sha }}]"
             git push origin master
             echo "🚀 Successfully synced to AUR!"
           fi

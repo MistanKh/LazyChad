@@ -1,0 +1,152 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Shell syntax
+        run: bash -n bin/* install.sh scripts/*.sh tests/*.sh
+
+      - name: ShellCheck
+        run: |
+          shellcheck --version
+          shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh
+          shellcheck -s bash -S warning lazychad.install
+
+      - name: Shell tests
+        run: for t in tests/*.sh; do echo "## $t"; bash "$t" || exit 1; done
+
+      - name: Version consistency
+        run: bash scripts/check-version.sh
+
+      - name: StyLua
+        uses: JohnnyMorganz/stylua-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          version: 2.5.2
+          args: --check init.lua lua
+
+  build-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install nfpm
+
+      - name: Build packages
+        run: |
+          nfpm package --config nfpm.yaml --packager deb
+          nfpm package --config nfpm.yaml --packager rpm
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          path: |
+            *.deb
+            *.rpm
+
+  # Install, upgrade and remove the .deb; user config must survive everything
+  # except an explicit purge.
+  deb-lifecycle:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    container:
+      image: debian:stable
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+
+      - name: Install
+        run: |
+          apt-get update
+          apt-get install -y ./lazychad_*.deb
+          test -x /usr/bin/lchad
+          test -x /usr/bin/lazychad-deps
+          test -f /usr/share/lazychad/init.lua
+          test -f /usr/share/lazychad/lua/configs/bootstrap.lua
+
+      - name: Upgrade keeps user config
+        run: |
+          mkdir -p /home/tester/.config/LazyChad
+          touch /home/tester/.config/LazyChad/mine.lua
+          apt-get install -y --reinstall ./lazychad_*.deb
+          test -f /home/tester/.config/LazyChad/mine.lua
+
+      - name: Remove keeps user config, purge deletes it
+        run: |
+          apt-get remove -y lazychad
+          test -f /home/tester/.config/LazyChad/mine.lua
+          apt-get purge -y lazychad
+          test ! -e /home/tester/.config/LazyChad
+
+  rpm-lifecycle:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+
+      - name: Install
+        run: |
+          dnf install -y ./lazychad-*.rpm
+          test -x /usr/bin/lchad
+          test -f /usr/share/lazychad/init.lua
+
+      - name: Upgrade and remove keep user config
+        run: |
+          mkdir -p /home/tester/.config/LazyChad
+          touch /home/tester/.config/LazyChad/mine.lua
+          dnf reinstall -y ./lazychad-*.rpm
+          test -f /home/tester/.config/LazyChad/mine.lua
+          dnf remove -y lazychad
+          test -f /home/tester/.config/LazyChad/mine.lua
+
+  # The real user flow: install the .deb, run lazychad-deps (Neovim nightly,
+  # tools, plugins, Mason, parsers), then boot LazyChad and fail on any error.
+  end-to-end:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: packages
+
+      - name: Install package
+        run: sudo apt-get install -y ./lazychad_*.deb
+
+      - name: lazychad-deps
+        run: lazychad-deps
+
+      - name: Doctor
+        run: lchad --doctor
+
+      - name: Boot without errors
+        run: |
+          printf 'local x = 1\nreturn x\n' > sample.lua
+          lchad --headless sample.lua \
+            -c 'sleep 5' \
+            -c 'lua if vim.v.errmsg ~= "" then io.stderr:write("startup error: " .. vim.v.errmsg .. "\n") vim.cmd "cquit 1" end' \
+            -c 'qa!'
+
+      - name: Upload deps log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lazychad-deps-log
+          path: ~/.local/state/LazyChad/lazychad-deps.log

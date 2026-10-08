@@ -15,6 +15,9 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Check version consistency
+        run: bash scripts/check-version.sh "$GITHUB_REF_NAME"
+
       - name: Install nfpm
         run: |
           echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
@@ -27,6 +30,9 @@ jobs:
       - name: Build .rpm package
         run: nfpm package --config nfpm.yaml --packager rpm
 
+      - name: Generate checksums
+        run: sha256sum *.deb *.rpm > SHA256SUMS && cat SHA256SUMS
+
       - name: Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
@@ -34,5 +40,6 @@ jobs:
           files: |
             *.deb
             *.rpm
+            SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

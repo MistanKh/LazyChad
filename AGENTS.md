@@ -10,15 +10,20 @@ and uninstall.
 ## Commands
 
 - Check shell syntax:
-  `bash -n bin/lchad bin/lazychad-deps bin/lazychad-nvim bin/lazychad-uninstall`
+  `bash -n bin/* install.sh scripts/*.sh tests/*.sh`
+- Lint shell (CI runs this):
+  `shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh`
 - Run shell tests:
-  `bash tests/test_lazychad_nvim.sh`
-  `bash tests/test_lazychad_uninstall.sh`
-  `bash tests/test_linux_postremove.sh`
-- Format Lua:
+  `for t in tests/*.sh; do bash "$t" || break; done`
+- Format Lua (CI checks with `stylua --check`):
   `stylua init.lua lua`
+- Check that every file carrying the version agrees:
+  `bash scripts/check-version.sh [vX.Y.Z]`
 - Package/release files to keep in sync:
   `.version`, `PKGBUILD`, `nfpm.yaml`, `README.md`, and the AUR `.SRCINFO`.
+- Release flow: bump the version files, merge to `main`, push tag `vX.Y.Z`.
+  The tag builds the `.deb`/`.rpm` + `SHA256SUMS` release and syncs the AUR
+  (`updpkgsums` pins the tarball checksum). `install.sh` installs that release.
 
 ## Agent History With ctx
 
@@ -45,6 +50,8 @@ current source. Cite any recovered decision that affects a code change.
   unless explicitly asked.
 - Do not remove or rewrite user Neovim config/data directories during
   development.
+- Package hooks must never delete user data on upgrade or plain removal; only
+  `apt purge` and `lazychad-uninstall` remove it.
 - Preserve `NVIM_APPNAME=LazyChad` isolation.
 - Keep `lazychad-nvim` tarball-first for Neovim and never add
   `apt-get remove neovim`.
