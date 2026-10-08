@@ -27,6 +27,13 @@ assert_eq "$(version_from_release_url https://github.com/MistanKh/LazyChad/relea
 assert_eq "$(version_from_release_url https://github.com/MistanKh/LazyChad/releases || echo none)" "none" \
   "no version without a tag"
 
+# digest parser must match lazychad-nvim's copy exactly
+install_digest="$(declare -f release_asset_digest)"
+nvim_digest="$(bash -c "source '$HERE/../bin/lazychad-nvim'; declare -f release_asset_digest")"
+assert_eq "$install_digest" "$nvim_digest" "release_asset_digest identical in install.sh and lazychad-nvim"
+deps_digest="$(bash -c "source '$HERE/../bin/lazychad-deps'; declare -f release_asset_digest")"
+assert_eq "$deps_digest" "$nvim_digest" "release_asset_digest identical in lazychad-deps and lazychad-nvim"
+
 # install.sh and lazychad-deps must map distros the same way
 install_family="$(declare -f detect_family)"
 # shellcheck source=/dev/null

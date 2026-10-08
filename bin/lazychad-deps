@@ -44,7 +44,7 @@ Usage: lazychad-deps [options]
 
 Options:
   --gui           Also install the Neovide GUI (builds with Rust if no prebuilt fits)
-  --stable        Install Neovim stable instead of nightly (LazyChad needs 0.12+)
+  --nightly       Install Neovim nightly instead of the latest stable release
   --skip-nvim     Don't install or update Neovim
   --no-bootstrap  Don't pre-install plugins, Mason tools and parsers
   -h, --help      Show this help
@@ -95,6 +95,25 @@ find_helper() {
     else
         return 1
     fi
+}
+
+github_api() {
+    # GET a GitHub API URL; uses $GITHUB_TOKEN when set (avoids rate limits in CI).
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$1"
+    else
+        curl -fsSL "$1"
+    fi
+}
+
+release_asset_digest() {
+    # $1=release JSON file (GitHub API)  $2=asset name; prints its sha256 or nothing.
+    # Splits the JSON into one field per line and tracks the current asset name.
+    tr ',{}' '\n\n\n' < "$1" | awk -v want="\"$2\"" '
+        /"name"[[:space:]]*:/ { cur = $0; sub(/^[^:]*:[[:space:]]*/, "", cur); gsub(/[[:space:]]+$/, "", cur) }
+        /"digest"[[:space:]]*:[[:space:]]*"sha256:/ && cur == want {
+            sub(/.*"sha256:/, ""); sub(/".*/, ""); print; exit
+        }'
 }
 
 # Install a list of packages best-effort. Try one batch first (fast); if that
@@ -154,7 +173,7 @@ set_family_packages() {
             DEPS=(
                 "git" "curl" "tar" "unzip" "make" "gcc" "cmake" "gnupg" "ca-certificates"
                 "nodejs" "npm" "python3" "python3-pip" "python3-pynvim"
-                "ripgrep" "fd-find" "fonts-jetbrains-mono"
+                "ripgrep" "fd-find" "fontconfig" "xz-utils"
                 "lua5.1" "luarocks" "wl-clipboard" "xclip"
             )
             # Runtime libs the prebuilt Neovide binary links against (not the -dev
@@ -183,7 +202,7 @@ set_family_packages() {
             DEPS=(
                 "git" "curl" "tar" "unzip" "make" "gcc" "gcc-c++" "cmake"
                 "nodejs" "npm" "python3" "python3-pip" "python3-neovim"
-                "ripgrep" "fd-find" "jetbrains-mono-fonts"
+                "ripgrep" "fd-find" "fontconfig" "xz"
                 "lua5.1" "luarocks" "wl-clipboard" "xclip"
             )
             GUI_DEPS=(
@@ -215,12 +234,59 @@ step_neovim() {
     fi
 }
 
+install_nerd_font() {
+    # Debian/Fedora don't package the Nerd Font variant (fonts-jetbrains-mono
+    # has no icons), so fetch JetBrainsMono Nerd Font into the user's fonts.
+    local font_dir="${XDG_DATA_HOME:-$HOME/.local/share}/fonts/JetBrainsMonoNerdFont"
+    local asset="JetBrainsMono.tar.xz" tmp expected actual
+    if exists fc-list && fc-list 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+        echo -e "${GREEN}✅ JetBrainsMono Nerd Font is already installed.${NC}"
+        return 0
+    fi
+    echo -e "${BLUE}Installing JetBrainsMono Nerd Font into $font_dir...${NC}"
+    tmp="$(mktemp -d)"
+    if ! curl -fSL "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/$asset" -o "$tmp/$asset"; then
+        rm -rf "$tmp"
+        warn_fail "Nerd Font download failed; icons may render as boxes"
+        return 0
+    fi
+    expected=""
+    if github_api https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest >"$tmp/release.json" 2>/dev/null; then
+        expected="$(release_asset_digest "$tmp/release.json" "$asset")"
+    fi
+    if [ -n "$expected" ]; then
+        actual="$(sha256sum "$tmp/$asset" | awk '{ print $1 }')"
+        if [ "$actual" != "$expected" ]; then
+            rm -rf "$tmp"
+            warn_fail "Nerd Font checksum mismatch; not installed"
+            return 0
+        fi
+    else
+        echo -e "${YELLOW}Could not fetch the published checksum; skipping verification.${NC}"
+    fi
+    # Only the four styles a terminal/Neovide uses (the full family is huge).
+    tar -xJf "$tmp/$asset" -C "$tmp" --wildcards --no-anchored \
+        'JetBrainsMonoNerdFont-Regular.ttf' 'JetBrainsMonoNerdFont-Bold.ttf' \
+        'JetBrainsMonoNerdFont-Italic.ttf' 'JetBrainsMonoNerdFont-BoldItalic.ttf' 2>/dev/null
+    if ! find "$tmp" -name 'JetBrainsMonoNerdFont-Regular.ttf' | grep -q .; then
+        rm -rf "$tmp"
+        warn_fail "Nerd Font archive had no JetBrainsMonoNerdFont-Regular.ttf; not installed"
+        return 0
+    fi
+    mkdir -p "$font_dir"
+    find "$tmp" -name 'JetBrainsMonoNerdFont-*.ttf' -exec cp {} "$font_dir/" \;
+    rm -rf "$tmp"
+    exists fc-cache && fc-cache -f "$font_dir" >/dev/null 2>&1
+    echo -e "${GREEN}✅ JetBrainsMono Nerd Font installed. Select it in your terminal's settings.${NC}"
+}
+
 step_system_packages() {
     echo -e "\n${BOLD}${YELLOW}[2/6] System packages${NC}"
     if [ "$FAMILY" = "debian" ]; then
         sudo apt-get update || warn_fail "apt-get update failed (network?); package install may be incomplete"
     fi
     install_missing "System packages" "${DEPS[@]}"
+    [ "$FAMILY" = "arch" ] || install_nerd_font   # Arch: ttf-jetbrains-mono-nerd above
 
     # On Debian/Fedora the package is 'fd-find' and ships the binary as 'fdfind';
     # Telescope/NvChad expect 'fd'. Bridge it with a user-local symlink.

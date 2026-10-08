@@ -9,7 +9,7 @@ jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Shell syntax
         run: bash -n bin/* install.sh scripts/*.sh tests/*.sh
@@ -36,7 +36,7 @@ jobs:
   build-packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Install nfpm
         run: |
@@ -49,7 +49,7 @@ jobs:
           nfpm package --config nfpm.yaml --packager deb
           nfpm package --config nfpm.yaml --packager rpm
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: packages
           path: |
@@ -64,7 +64,7 @@ jobs:
     container:
       image: debian:stable
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: packages
 
@@ -97,7 +97,7 @@ jobs:
     container:
       image: fedora:latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: packages
 
@@ -123,7 +123,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: packages
 
@@ -132,6 +132,14 @@ jobs:
 
       - name: lazychad-deps
         run: lazychad-deps
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stable Neovim and Nerd Font installed
+        run: |
+          nvim --version | head -1
+          nvim --version | head -1 | grep -qv -- '-dev'
+          fc-list | grep -i "JetBrainsMono Nerd Font"
 
       - name: Doctor
         run: lchad --doctor
@@ -146,7 +154,7 @@ jobs:
 
       - name: Upload deps log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: lazychad-deps-log
           path: ~/.local/state/LazyChad/lazychad-deps.log

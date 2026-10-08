@@ -18,15 +18,13 @@ uname() { echo "arm64"; };  assert_eq "$(detect_arch)" "nvim-linux-arm64"  "dete
 uname() { echo "riscv64"; };assert_eq "$(detect_arch)" "unsupported"       "detect_arch riscv64"
 unset -f uname
 
-# download URL includes the v prefix
-assert_eq "$(nvim_download_url nvim-linux-x86_64 0.12.0)" \
-  "https://github.com/neovim/neovim/releases/download/v0.12.0/nvim-linux-x86_64.tar.gz" \
-  "nvim_download_url has v prefix"
-
-# nightly URL uses the 'nightly' tag (no version)
-assert_eq "$(nvim_nightly_url nvim-linux-x86_64)" \
-  "https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.tar.gz" \
-  "nvim_nightly_url uses nightly tag"
+# release URLs for a stable tag and for nightly
+assert_eq "$(nvim_release_url nvim-linux-x86_64 v0.12.5)" \
+  "https://github.com/neovim/neovim/releases/download/v0.12.5/nvim-linux-x86_64.tar.gz" \
+  "nvim_release_url for a stable tag"
+assert_eq "$(nvim_release_url nvim-linux-arm64 nightly)" \
+  "https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-arm64.tar.gz" \
+  "nvim_release_url for nightly"
 
 # nightly_hash_of extracts the g<hash> from a -dev version line
 assert_eq "$(nightly_hash_of 'NVIM v0.13.0-dev-752+gb8e3f3f4e0')" "b8e3f3f4e0" \
@@ -48,13 +46,41 @@ rm() { :; }                 # no-op rm so the test never deletes anything
 assert_eq "$(cleanup_manual >/dev/null 2>&1; echo $?)" "0" "cleanup_manual returns 0 when clean"
 unset -f sudo rm
 
-# checksum helpers
+# checksum helpers: digest lookup in a GitHub release API response
 tmpd="$(mktemp -d)"
 printf 'hello\n' > "$tmpd/nvim-linux-x86_64.tar.gz"
 good="$(sha256sum "$tmpd/nvim-linux-x86_64.tar.gz" | awk '{print $1}')"
-printf '%s  nvim-linux-arm64.tar.gz\n%s  nvim-linux-x86_64.tar.gz\n' deadbeef "$good" > "$tmpd/shasum.txt"
-assert_eq "$(sha256_from_sums "$tmpd/shasum.txt" nvim-linux-x86_64.tar.gz)" "$good" "sha256_from_sums picks the right asset"
-assert_eq "$(sha256_from_sums "$tmpd/shasum.txt" nvim-macos.tar.gz)" "" "sha256_from_sums empty for unknown asset"
+cat > "$tmpd/release.json" <<JSON
+{
+  "tag_name": "v0.12.5",
+  "name": "Nvim 0.12.5",
+  "author": { "login": "github-actions[bot]", "id": 41898282 },
+  "assets": [
+    {
+      "name": "nvim-linux-arm64.tar.gz",
+      "uploader": { "login": "github-actions[bot]", "id": 41898282 },
+      "size": 11,
+      "digest": "sha256:deadbeef",
+      "browser_download_url": "https://example.invalid/nvim-linux-arm64.tar.gz"
+    },
+    {
+      "name": "nvim-linux-x86_64.tar.gz",
+      "uploader": { "login": "github-actions[bot]", "id": 41898282 },
+      "size": 6,
+      "digest": "sha256:$good",
+      "browser_download_url": "https://example.invalid/nvim-linux-x86_64.tar.gz"
+    },
+    {
+      "name": "nvim-linux-x86_64.appimage",
+      "digest": null
+    }
+  ]
+}
+JSON
+assert_eq "$(release_asset_digest "$tmpd/release.json" nvim-linux-x86_64.tar.gz)" "$good" "release_asset_digest picks the right asset"
+assert_eq "$(release_asset_digest "$tmpd/release.json" nvim-linux-arm64.tar.gz)" "deadbeef" "release_asset_digest arm64"
+assert_eq "$(release_asset_digest "$tmpd/release.json" nvim-linux-x86_64.appimage)" "" "release_asset_digest empty for null digest"
+assert_eq "$(release_asset_digest "$tmpd/release.json" nvim-macos-arm64.tar.gz)" "" "release_asset_digest empty for unknown asset"
 assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "$good" && echo yes || echo no)" "yes" "verify_sha256 accepts match"
 assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" deadbeef && echo yes || echo no)" "no" "verify_sha256 rejects mismatch"
 assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "" && echo yes || echo no)" "no" "verify_sha256 rejects empty hash"

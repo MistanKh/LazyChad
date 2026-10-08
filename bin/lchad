@@ -283,7 +283,7 @@ main() {
     v="$(nvim_version)"
     if ! version_ok "$v"; then
         echo -e "${YELLOW}⚠️  Neovim ${v:-unknown} detected, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}"
-        echo -e "${YELLOW}    Run 'lazychad-nvim' (installs nightly) to upgrade. Continuing anyway...${NC}"
+        echo -e "${YELLOW}    Run 'lazychad-nvim' to install the latest stable Neovim. Continuing anyway...${NC}"
     elif ! plugins_installed && is_tty; then
         # First launch: install everything up front, so the editor opens ready.
         run_bootstrap || echo -e "${YELLOW}Continuing; lazy.nvim will retry on launch.${NC}"

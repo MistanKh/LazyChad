@@ -11,7 +11,7 @@
 # Options (pass after `bash -s --`):
 #   --version X.Y.Z   Install a specific release instead of the latest
 #   --no-deps         Only install the package; skip 'lazychad-deps'
-#   anything else     Passed to lazychad-deps (e.g. --gui, --stable)
+#   anything else     Passed to lazychad-deps (e.g. --gui, --nightly)
 
 set -euo pipefail
 
@@ -62,15 +62,38 @@ latest_version() {
     version_from_release_url "$url"
 }
 
-verify_download() {
-    # $1=dir $2=asset. Checks SHA256SUMS from the release when it has one.
-    local dir="$1" asset="$2" expected actual
-    if ! curl -fsSL "https://github.com/$REPO/releases/download/v$VERSION/SHA256SUMS" -o "$dir/SHA256SUMS"; then
-        warn "This release has no SHA256SUMS; skipping checksum verification."
+release_asset_digest() {
+    # $1=release JSON file (GitHub API)  $2=asset name; prints its sha256 or nothing.
+    # (Same parser as lazychad-nvim; this script must stay standalone.)
+    tr ',{}' '\n\n\n' < "$1" | awk -v want="\"$2\"" '
+        /"name"[[:space:]]*:/ { cur = $0; sub(/^[^:]*:[[:space:]]*/, "", cur); gsub(/[[:space:]]+$/, "", cur) }
+        /"digest"[[:space:]]*:[[:space:]]*"sha256:/ && cur == want {
+            sub(/.*"sha256:/, ""); sub(/".*/, ""); print; exit
+        }'
+}
+
+expected_sha256() {
+    # $1=dir $2=asset. GitHub's per-asset digest first, then the release's SHA256SUMS.
+    local dir="$1" asset="$2" auth=()
+    [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
+    if curl -fsSL "${auth[@]+"${auth[@]}"}" "https://api.github.com/repos/$REPO/releases/tags/v$VERSION" \
+            -o "$dir/release.json" 2>/dev/null; then
+        release_asset_digest "$dir/release.json" "$asset"
         return 0
     fi
-    expected="$(awk -v name="$asset" '$2 == name { print $1; exit }' "$dir/SHA256SUMS")"
-    [ -n "$expected" ] || die "$asset is not listed in SHA256SUMS."
+    if curl -fsSL "https://github.com/$REPO/releases/download/v$VERSION/SHA256SUMS" -o "$dir/SHA256SUMS" 2>/dev/null; then
+        awk -v name="$asset" '$2 == name { print $1; exit }' "$dir/SHA256SUMS"
+    fi
+}
+
+verify_download() {
+    # $1=dir $2=asset
+    local dir="$1" asset="$2" expected actual
+    expected="$(expected_sha256 "$dir" "$asset")"
+    if [ -z "$expected" ]; then
+        warn "Could not fetch a published checksum for $asset; skipping verification."
+        return 0
+    fi
     actual="$(sha256sum "$dir/$asset" | awk '{ print $1 }')"
     [ "$actual" = "$expected" ] || die "Checksum mismatch for $asset; aborting."
     echo -e "${GREEN}Checksum verified.${NC}"

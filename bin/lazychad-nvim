@@ -4,15 +4,16 @@
 # into /usr/local (shadowing any apt/pacman nvim via PATH). Tarball-first,
 # arch-aware, with native package-manager fallback.
 #
-# Defaults to the **nightly** channel, because LazyChad needs Neovim 0.12+
-# (required by nvim-treesitter) and the current stable line is still 0.11.
-# Use --stable to install the latest stable release instead.
-# Run as a normal user; escalates with sudo per-command.
+# Defaults to the latest **stable** release; LazyChad needs Neovim 0.12+
+# (required by nvim-treesitter). If stable is ever older than that, it falls
+# back to nightly. Use --nightly to track nightly builds instead.
+# Downloads are verified against the SHA-256 digest GitHub publishes for each
+# release asset. Run as a normal user; escalates with sudo per-command.
 
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
 
-# Channel: "nightly" (default) or "stable". Overridden by main() flags.
-NVIM_CHANNEL="${NVIM_CHANNEL:-nightly}"
+# Channel: "stable" (default) or "nightly". Overridden by main() flags.
+NVIM_CHANNEL="${NVIM_CHANNEL:-stable}"
 
 # Minimum Neovim LazyChad requires (nvim-treesitter needs 0.12+).
 MIN_NVIM_MAJOR=0
@@ -28,14 +29,9 @@ detect_arch() {
     esac
 }
 
-nvim_download_url() {
-    # $1=asset base  $2=version (X.Y.Z, no leading v)
-    echo "https://github.com/neovim/neovim/releases/download/v$2/$1.tar.gz"
-}
-
-nvim_nightly_url() {
-    # $1=asset base
-    echo "https://github.com/neovim/neovim/releases/download/nightly/$1.tar.gz"
+nvim_release_url() {
+    # $1=asset base  $2=release tag (vX.Y.Z or nightly)
+    echo "https://github.com/neovim/neovim/releases/download/$2/$1.tar.gz"
 }
 
 get_installed_version() {
@@ -72,9 +68,23 @@ nightly_hash_of() {
     printf '%s' "$1" | grep -oiP '\+g\K[0-9a-f]{7,}' || true
 }
 
-sha256_from_sums() {
-    # $1=sums file ("<hash>  <name>" lines)  $2=file name; prints the hash or nothing
-    awk -v name="$2" '{ f = $2; sub(/^\*/, "", f); if (f == name) { print $1; exit } }' "$1"
+github_api() {
+    # GET a GitHub API URL; uses $GITHUB_TOKEN when set (avoids rate limits in CI).
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        curl -fsSL -H "Authorization: Bearer $GITHUB_TOKEN" "$1"
+    else
+        curl -fsSL "$1"
+    fi
+}
+
+release_asset_digest() {
+    # $1=release JSON file (GitHub API)  $2=asset name; prints its sha256 or nothing.
+    # Splits the JSON into one field per line and tracks the current asset name.
+    tr ',{}' '\n\n\n' < "$1" | awk -v want="\"$2\"" '
+        /"name"[[:space:]]*:/ { cur = $0; sub(/^[^:]*:[[:space:]]*/, "", cur); gsub(/[[:space:]]+$/, "", cur) }
+        /"digest"[[:space:]]*:[[:space:]]*"sha256:/ && cur == want {
+            sub(/.*"sha256:/, ""); sub(/".*/, ""); print; exit
+        }'
 }
 
 verify_sha256() {
@@ -93,7 +103,7 @@ get_latest_version() {
 get_latest_nightly_hash() {
     # The nightly release body carries the exact build string, e.g.
     # "NVIM v0.13.0-dev-752+gb8e3f3f4e0" -> we extract the g<hash>.
-    curl -fsSL https://api.github.com/repos/neovim/neovim/releases/tags/nightly 2>/dev/null \
+    github_api https://api.github.com/repos/neovim/neovim/releases/tags/nightly 2>/dev/null \
         | grep -oiP 'NVIM v[0-9.]+-dev-[0-9]+\+g\K[0-9a-f]{7,}' | head -1 || echo ""
 }
 
@@ -163,24 +173,30 @@ native_fallback() {
 }
 
 install_tarball() {
-    # $1=asset  $2=url  $3=label
-    local asset="$1" url="$2" label="$3" tmp
+    # $1=asset  $2=release tag (vX.Y.Z or nightly)  $3=label
+    local asset="$1" tag="$2" label="$3" tmp url expected=""
+    url="$(nvim_release_url "$asset" "$tag")"
     tmp="$(mktemp -d)"
     echo -e "${BLUE}Downloading Neovim ${label} ($asset)...${NC}"
     if ! curl -fSL "$url" -o "$tmp/$asset.tar.gz"; then rm -rf "$tmp"; return 1; fi
-    # Neovim publishes shasum.txt next to the release assets.
-    local expected=""
-    if curl -fsSL "${url%/*}/shasum.txt" -o "$tmp/shasum.txt"; then
-        expected="$(sha256_from_sums "$tmp/shasum.txt" "$asset.tar.gz")"
+
+    # GitHub publishes a SHA-256 digest for every release asset.
+    if github_api "https://api.github.com/repos/neovim/neovim/releases/tags/$tag" >"$tmp/release.json" 2>/dev/null; then
+        expected="$(release_asset_digest "$tmp/release.json" "$asset.tar.gz")"
     fi
     if [ -z "$expected" ]; then
-        echo -e "${YELLOW}No published checksum found for $asset.tar.gz; skipping verification.${NC}"
+        echo -e "${YELLOW}Could not fetch the published checksum (GitHub API unavailable?); skipping verification.${NC}"
     elif verify_sha256 "$tmp/$asset.tar.gz" "$expected"; then
         echo -e "${GREEN}Checksum verified.${NC}"
     else
         echo -e "${RED}❌ Checksum mismatch for $asset.tar.gz; refusing to install it.${NC}"
+        [ "$tag" = "nightly" ] && echo -e "${YELLOW}   (A new nightly may have been published mid-download; re-run to retry.)${NC}"
         rm -rf "$tmp"; return 1
     fi
+
+    # Clear the previous tarball's runtime so files from another version
+    # (e.g. nightly -> stable) can't be sourced at startup.
+    sudo rm -rf /usr/local/share/nvim/runtime /usr/local/lib/nvim
     echo -e "${BLUE}Extracting to /usr/local...${NC}"
     if ! sudo tar -xzf "$tmp/$asset.tar.gz" -C /usr/local --strip-components=1; then rm -rf "$tmp"; return 1; fi
     rm -rf "$tmp"
@@ -197,20 +213,22 @@ install_stable() {
     fi
 
     echo -e "Installed: ${current}    Latest stable: ${latest}"
+    if ! version_ge_min "$latest"; then
+        echo -e "${YELLOW}Stable v$latest is older than ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}, which LazyChad needs; using nightly instead.${NC}"
+        install_nightly "$asset"; return $?
+    fi
     if [ "$current" = "$latest" ]; then
         echo -e "${GREEN}✅ Already on the latest stable Neovim (v$latest).${NC}"
         return 0
     fi
+    if [ -n "$(nightly_hash_of "$(get_installed_build)")" ]; then
+        echo -e "${YELLOW}Switching from a nightly build to stable v$latest (use --nightly to stay on nightly).${NC}"
+    fi
 
     cleanup_manual
     note_apt_neovim
-    if install_tarball "$asset" "$(nvim_download_url "$asset" "$latest")" "v$latest"; then
+    if install_tarball "$asset" "v$latest" "v$latest" && verify_min; then
         echo -e "${GREEN}✅ Neovim v$latest installed to /usr/local.${NC}"
-        nvim --version | head -1
-        if ! version_ge_min "$latest"; then
-            echo -e "${YELLOW}Heads up: v$latest is below ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}, which LazyChad needs.${NC}"
-            echo -e "${YELLOW}Run 'lazychad-nvim' (without --stable) to get a compatible nightly.${NC}"
-        fi
         return 0
     fi
 
@@ -237,7 +255,7 @@ install_nightly() {
 
     cleanup_manual
     note_apt_neovim
-    if install_tarball "$asset" "$(nvim_nightly_url "$asset")" "nightly" && verify_min; then
+    if install_tarball "$asset" "nightly" "nightly" && verify_min; then
         echo -e "${GREEN}✅ Neovim nightly installed to /usr/local.${NC}"
         return 0
     fi
@@ -288,13 +306,16 @@ Actions:
   --help, -h                       Show this help
 
 Channels:
-  --nightly   Install the nightly build (DEFAULT — needed for 0.12+)
-  --stable    Install the latest stable release (currently 0.11.x)
+  --stable    Install the latest stable release (DEFAULT; LazyChad needs 0.12+)
+  --nightly   Install the nightly build instead
+
+Downloads are verified against GitHub's published SHA-256 digests. Set
+GITHUB_TOKEN to avoid GitHub API rate limits on shared IPs.
 EOF
 }
 
 main() {
-    NVIM_CHANNEL="nightly"
+    NVIM_CHANNEL="stable"
     local action="install"
     while [ $# -gt 0 ]; do
         case "$1" in
