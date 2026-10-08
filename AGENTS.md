@@ -25,6 +25,9 @@ and uninstall.
   Add release notes as `docs/releases/vX.Y.Z.md` (used as the release body).
   The tag builds the `.deb`/`.rpm` + `SHA256SUMS` release and syncs the AUR
   (`updpkgsums` pins the tarball checksum). `install.sh` installs that release.
+  Without a terminal (or where tag pushes are blocked), run the "Package
+  Release" workflow on `main` with `version=X.Y.Z`: it creates the tag and
+  release, then starts the AUR sync for that tag.
 
 ## Agent History With ctx
 

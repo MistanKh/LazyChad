@@ -4,9 +4,18 @@ on:
   push:
     tags:
       - 'v*'
+  # Release without pushing a tag yourself (GitHub UI, mobile app, API):
+  # tags the selected commit as vX.Y.Z, publishes the release, then starts the
+  # AUR sync for that tag (a tag created by GITHUB_TOKEN doesn't trigger it).
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (X.Y.Z; must match .version on the selected branch)'
+        required: true
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   build-packages:
@@ -15,8 +24,24 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v5
 
+      - name: Resolve tag
+        id: tag
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="v${INPUT_VERSION#v}"
+            if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null; then
+              echo "::error::$tag already exists; bump the version instead of re-releasing it."
+              exit 1
+            fi
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Check version consistency
-        run: bash scripts/check-version.sh "$GITHUB_REF_NAME"
+        run: bash scripts/check-version.sh "${{ steps.tag.outputs.tag }}"
 
       - name: Install nfpm
         run: |
@@ -34,14 +59,17 @@ jobs:
         run: sha256sum *.deb *.rpm > SHA256SUMS && cat SHA256SUMS
 
       - name: Release notes
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
         run: |
-          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          notes="docs/releases/${TAG}.md"
           if [ -f "$notes" ]; then cp "$notes" release-notes.md; else : > release-notes.md; fi
 
       - name: Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          target_commitish: ${{ github.sha }}
           body_path: release-notes.md
           files: |
             *.deb
@@ -49,3 +77,10 @@ jobs:
             SHA256SUMS
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Start the AUR sync
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: gh workflow run aur-sync.yml --ref "$TAG" --repo "$GITHUB_REPOSITORY"
