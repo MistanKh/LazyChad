@@ -140,7 +140,9 @@ case $FAMILY in
             "libsndio-dev" "libglut-dev" "libxmu-dev" "libxi-dev" "libfontconfig1-dev"
             "libxcursor-dev"
         )
-        check_installed() { dpkg -l "$1" >/dev/null 2>&1; }
+        # dpkg -l also succeeds for removed-but-not-purged ("rc") packages,
+        # so check the real install status instead.
+        check_installed() { dpkg-query -W -f='${Status}' "$1" 2>/dev/null | grep -q "install ok installed"; }
         ;;
     fedora)
         PKG_MANAGER="sudo dnf install -y"

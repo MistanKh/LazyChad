@@ -61,7 +61,7 @@ lazychad-deps   # required: installs the latest Neovim + providers
 ```
 *Note: `lazychad-deps` installs Neovim nightly via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
 
-### Option 4: Manual Installation (All Linux/macOS)
+### Option 4: Manual Installation (Any Linux)
 If you prefer to install manually, follow these steps:
 
 #### 1. Clone LazyChad
@@ -101,7 +101,7 @@ reported issue.
 
 ### Step 1: Update the Package
 *   **Arch Linux**: `paru -Syu` or `yay -Syu`
-*   **Fedora**: `sudo dnf update lazychad`
+*   **Fedora/RHEL**: Download and install the new `.rpm` (`sudo dnf install ./lazychad-<version>-1.noarch.rpm`).
 *   **Debian/Ubuntu/Kali**: Download and install the new `.deb`.
 *   **Manual**: `cd ~/.config/LazyChad && git pull`
 
@@ -110,6 +110,7 @@ Run `lchad`. If a system-wide update is detected, LazyChad will automatically pr
 `🔔 System update detected (v1.3.7 -> v1.3.8)!`
 
 Press `y` to sync. Your old configuration will be safely backed up to a timestamped folder in `~/.config/`.
+Package upgrades never delete your config; user directories are only cleaned when LazyChad is removed.
 
 ### Step 3: Refresh Toolchain
 Run the dependency script to ensure your Neovim, Node, and Python providers are up to date:
@@ -150,7 +151,7 @@ lazychad-uninstall --yes # skip prompts (scripted use)
 
 This removes the bundled Neovim, the LazyChad binaries and files, and the
 per-user LazyChad directories. It detects whether LazyChad was installed via
-`apt`/`pacman` or manually and removes it the matching way. Shared tools
+`apt`/`pacman`/`dnf` (rpm) or manually and removes it the matching way. Shared tools
 (Node, Rust, Neovide, fonts) are **not** removed.
 
 <details>

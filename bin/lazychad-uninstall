@@ -4,8 +4,6 @@
 # dirs. Leaves shared deps (Node, Rust, Neovide, fonts) untouched.
 # Confirms and offers a config backup first. Run as a normal user; uses sudo.
 
-set -uo pipefail
-
 BOLD="\033[1m"; GREEN="\033[0;32m"; BLUE="\033[0;34m"; YELLOW="\033[0;33m"; RED="\033[0;31m"; NC="\033[0m"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -67,6 +65,15 @@ remove_lazychad() {
     elif command -v pacman >/dev/null 2>&1 && pacman -Qo /usr/bin/lchad >/dev/null 2>&1; then
         echo -e "${BLUE}Detected pacman install. Removing the lazychad package...${NC}"
         sudo pacman -R --noconfirm lazychad
+    elif command -v rpm >/dev/null 2>&1 && rpm -qf /usr/bin/lchad >/dev/null 2>&1; then
+        echo -e "${BLUE}Detected rpm install. Removing the lazychad package...${NC}"
+        if command -v dnf >/dev/null 2>&1; then
+            sudo dnf remove -y lazychad
+        elif command -v zypper >/dev/null 2>&1; then
+            sudo zypper remove -y lazychad
+        else
+            sudo rpm -e lazychad
+        fi
     else
         echo -e "${BLUE}Removing manual LazyChad install...${NC}"
         sudo rm -f /usr/bin/lchad /usr/bin/lazychad-deps /usr/bin/lazychad-nvim /usr/bin/lazychad-uninstall
@@ -102,5 +109,6 @@ main() {
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+    set -uo pipefail
     main "$@"
 fi

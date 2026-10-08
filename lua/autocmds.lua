@@ -24,8 +24,7 @@ local function install_ts(buf)
   if ts_installing[lang] then return end
 
   -- Check if parser is already installed
-  local ok_configs, ts_configs = pcall(require, "nvim-treesitter.configs")
-  if ok_configs then
+  if pcall(require, "nvim-treesitter.configs") then
     local parser_config = require("nvim-treesitter.parsers").get_parser_configs()
     if not parser_config[lang] then return end -- No parser exists for this lang
   end
@@ -36,8 +35,8 @@ local function install_ts(buf)
 
   vim.schedule(function()
     -- Use the official Ex command for maximum reliability across versions
-    local ok = pcall(vim.cmd, "TSInstall " .. lang)
-    
+    pcall(vim.cmd, "TSInstall " .. lang)
+
     -- Clear the installing flag after a generous timeout to allow async install to finish
     vim.defer_fn(function()
       ts_installing[lang] = nil

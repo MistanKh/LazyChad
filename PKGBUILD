@@ -8,14 +8,17 @@ arch=('any')
 url="https://github.com/MistanKh/LazyChad"
 license=('MIT')
 depends=(
-  'neovim' 'git' 'ripgrep' 'fd' 'bash' 'make' 'unzip' 'gcc'
+  'git' 'ripgrep' 'fd' 'bash' 'make' 'unzip' 'gcc'
   'ttf-jetbrains-mono-nerd' 'neovide'
 
-  'nodejs' 'npm' 
+  'nodejs' 'npm'
   'python' 'python-pip'
   'lazygit' 'lua51' 'luarocks' 'lua-jsregexp'
   'wl-clipboard' 'xclip'
 )
+# neovim is optional, as in nfpm.yaml: 'lazychad-nvim' installs Neovim 0.12+
+# to /usr/local, and a hard depend would tie LazyChad to the repo package.
+optdepends=('neovim: system Neovim (lazychad-deps installs 0.12+ to /usr/local)')
 provides=('lchad')
 install=lazychad.install
 source=("git+https://github.com/MistanKh/LazyChad.git")

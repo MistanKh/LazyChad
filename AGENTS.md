@@ -14,6 +14,7 @@ and uninstall.
 - Run shell tests:
   `bash tests/test_lazychad_nvim.sh`
   `bash tests/test_lazychad_uninstall.sh`
+  `bash tests/test_linux_postremove.sh`
 - Format Lua:
   `stylua init.lua lua`
 - Package/release files to keep in sync:

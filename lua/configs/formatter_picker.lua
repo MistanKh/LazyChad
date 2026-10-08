@@ -55,7 +55,7 @@ function M.choose_for_filetype(ft, priority_delay)
       if ok_conform then
         valid = vim.iter(candidates):filter(function(c)
           local info = conform.get_formatter_info(c)
-          local info_alt = not (info and info.command) and conform.get_formatter_info(c:gsub("%-", "_")) or nil
+          local info_alt = not (info and info.command) and conform.get_formatter_info((c:gsub("%-", "_"))) or nil
           
           local tool = (info and info.command) and c or (info_alt and info_alt.command and c:gsub("%-", "_") or nil)
           if not tool and vim.list_contains(builtin_formatters, c) then tool = c end
@@ -187,7 +187,7 @@ function M.setup()
   end)
 
   vim.api.nvim_create_user_command("FormatPick", function(opts)
-    M.choose_for_filetype(opts.args ~= "" and opts.args or vim.bo.filetype, vim.api.nvim_get_current_buf())
+    M.choose_for_filetype(opts.args ~= "" and opts.args or vim.bo.filetype)
   end, { nargs = "?" })
 end
 

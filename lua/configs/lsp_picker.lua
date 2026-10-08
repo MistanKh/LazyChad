@@ -107,12 +107,15 @@ local function setup_server(server)
   local capabilities = nv_lsp.capabilities
   
   -- Check if the new Neovim 0.11+ API is available
+  -- vim.lsp.config[server] returns a resolved copy, so extend the config via
+  -- vim.lsp.config() instead of mutating that table
   if vim.lsp.config then
-    local config = vim.lsp.config[server]
-    if config then
-      config.on_attach = on_attach
-      config.on_init = on_init
-      config.capabilities = vim.tbl_deep_extend("force", config.capabilities or {}, capabilities)
+    if vim.lsp.config[server] then
+      vim.lsp.config(server, {
+        on_attach = on_attach,
+        on_init = on_init,
+        capabilities = capabilities,
+      })
       vim.lsp.enable(server)
       setup_servers[server] = true
       return
@@ -126,8 +129,7 @@ local function setup_server(server)
        on_init = on_init,
        capabilities = capabilities,
        root_dir = function(fname)
-         local util = require("lspconfig.util")
-         return util.find_git_ancestor(fname) or vim.loop.cwd()
+         return vim.fs.root(fname, ".git") or vim.uv.cwd()
        end,
      }
      setup_servers[server] = true
