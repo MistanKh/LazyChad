@@ -48,4 +48,16 @@ rm() { :; }                 # no-op rm so the test never deletes anything
 assert_eq "$(cleanup_manual >/dev/null 2>&1; echo $?)" "0" "cleanup_manual returns 0 when clean"
 unset -f sudo rm
 
+# checksum helpers
+tmpd="$(mktemp -d)"
+printf 'hello\n' > "$tmpd/nvim-linux-x86_64.tar.gz"
+good="$(sha256sum "$tmpd/nvim-linux-x86_64.tar.gz" | awk '{print $1}')"
+printf '%s  nvim-linux-arm64.tar.gz\n%s  nvim-linux-x86_64.tar.gz\n' deadbeef "$good" > "$tmpd/shasum.txt"
+assert_eq "$(sha256_from_sums "$tmpd/shasum.txt" nvim-linux-x86_64.tar.gz)" "$good" "sha256_from_sums picks the right asset"
+assert_eq "$(sha256_from_sums "$tmpd/shasum.txt" nvim-macos.tar.gz)" "" "sha256_from_sums empty for unknown asset"
+assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "$good" && echo yes || echo no)" "yes" "verify_sha256 accepts match"
+assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" deadbeef && echo yes || echo no)" "no" "verify_sha256 rejects mismatch"
+assert_eq "$(verify_sha256 "$tmpd/nvim-linux-x86_64.tar.gz" "" && echo yes || echo no)" "no" "verify_sha256 rejects empty hash"
+command rm -rf "$tmpd"
+
 exit $fail

@@ -2,10 +2,20 @@ require "nvchad.options"
 
 -- Language providers: LazyChad uses the Python and Node providers only.
 -- Disable Ruby/Perl so `:checkhealth` stays green instead of warning about
--- toolchains we don't ship. (Node: `npm i -g neovim`; Python: pynvim via pip —
+-- toolchains we don't ship. (Node: private npm prefix below; Python: distro pynvim package —
 -- both handled by `lazychad-deps`.)
 vim.g.loaded_ruby_provider = 0
 vim.g.loaded_perl_provider = 0
+
+-- lazychad-deps installs the Node provider and tree-sitter CLI into a private
+-- npm prefix (no `sudo npm -g`). Point Neovim at them when present.
+local node_bin = vim.fn.stdpath "data" .. "/node/node_modules/.bin"
+if vim.uv.fs_stat(node_bin .. "/neovim-node-host") then
+  vim.g.node_host_prog = node_bin .. "/neovim-node-host"
+end
+if vim.uv.fs_stat(node_bin) and not vim.env.PATH:find(node_bin, 1, true) then
+  vim.env.PATH = node_bin .. ":" .. vim.env.PATH
+end
 
 -- Silence all Neovim deprecation warnings (especially for stylize_markdown in 0.11+)
 vim.g.deprecation_warnings = false

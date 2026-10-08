@@ -2,10 +2,7 @@ return {
   {
     "williamboman/mason.nvim",
     opts = {
-      ensure_installed = {
-        "lua-language-server", -- Essential for Neovim config
-        "stylua", -- Essential for Neovim config
-      },
+      ensure_installed = require("configs.bootstrap").mason_packages,
     },
   },
 
@@ -31,14 +28,7 @@ return {
   {
     "nvim-treesitter/nvim-treesitter",
     opts = {
-      ensure_installed = {
-        "vim",
-        "lua",
-        "vimdoc",
-        "html",
-        "css",
-        "python",
-      },
+      ensure_installed = require("configs.bootstrap").treesitter_parsers,
     },
   },
 }
