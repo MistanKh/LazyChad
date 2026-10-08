@@ -8,10 +8,7 @@
 # 'lazychad-deps' so Neovim 0.12+, the tools and all plugins are ready before
 # the first launch.
 #
-# Options (pass after `bash -s --`):
-#   --version X.Y.Z   Install a specific release instead of the latest
-#   --no-deps         Only install the package; skip 'lazychad-deps'
-#   anything else     Passed to lazychad-deps (e.g. --gui, --nightly)
+# Options go after `bash -s --` (e.g. `| bash -s -- --gui`); see --help.
 
 set -euo pipefail
 
@@ -76,12 +73,12 @@ expected_sha256() {
     # $1=dir $2=asset. GitHub's per-asset digest first, then the release's SHA256SUMS.
     local dir="$1" asset="$2" auth=()
     [ -n "${GITHUB_TOKEN:-}" ] && auth=(-H "Authorization: Bearer $GITHUB_TOKEN")
-    if curl -fsSL "${auth[@]+"${auth[@]}"}" "https://api.github.com/repos/$REPO/releases/tags/v$VERSION" \
+    if curl -fsSL "${auth[@]+"${auth[@]}"}" "https://api.github.com/repos/$REPO/releases/tags/v$LAZYCHAD_VERSION" \
             -o "$dir/release.json" 2>/dev/null; then
         release_asset_digest "$dir/release.json" "$asset"
         return 0
     fi
-    if curl -fsSL "https://github.com/$REPO/releases/download/v$VERSION/SHA256SUMS" -o "$dir/SHA256SUMS" 2>/dev/null; then
+    if curl -fsSL "https://github.com/$REPO/releases/download/v$LAZYCHAD_VERSION/SHA256SUMS" -o "$dir/SHA256SUMS" 2>/dev/null; then
         awk -v name="$asset" '$2 == name { print $1; exit }' "$dir/SHA256SUMS"
     fi
 }
@@ -107,78 +104,141 @@ install_arch() {
     else
         info "No AUR helper found; building the AUR package with makepkg"
         sudo pacman -S --needed --noconfirm base-devel git
-        local tmp
-        tmp="$(mktemp -d)"
-        git clone --depth 1 https://aur.archlinux.org/lazychad.git "$tmp/lazychad"
-        (cd "$tmp/lazychad" && makepkg -si --noconfirm)
-        rm -rf "$tmp"
+        git clone --depth 1 https://aur.archlinux.org/lazychad.git "$WORK_DIR/lazychad"
+        (cd "$WORK_DIR/lazychad" && makepkg -si --noconfirm)
     fi
+}
+
+epel_enabled() {
+    dnf repolist --enabled 2>/dev/null | grep -qi '^epel'
+}
+
+epel_help() {
+    # $1=ID (rhel, rocky, almalinux, ol, centos)
+    echo "LazyChad needs packages from EPEL (ripgrep, fd-find, ...) on $1. Enable it first:"
+    case "$1" in
+        rhel) echo '  sudo subscription-manager repos --enable "codeready-builder-for-rhel-$(rpm -E %rhel)-$(arch)-rpms"'
+              echo '  sudo dnf install -y "https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm"' ;;
+        ol)   echo '  sudo dnf install -y "oracle-epel-release-el$(rpm -E %rhel)"' ;;
+        *)    echo '  sudo dnf install -y epel-release && sudo dnf config-manager --set-enabled crb' ;;
+    esac
 }
 
 install_release_package() {
-    local family="$1" asset tmp
-    asset="$(package_asset "$family" "$VERSION")"
-    tmp="$(mktemp -d)"
-    chmod 755 "$tmp"   # let apt's sandbox user read the file
+    local family="$1" asset
+    asset="$(package_asset "$family" "$LAZYCHAD_VERSION")"
+    chmod 755 "$WORK_DIR"   # let apt's sandbox user read the file
     info "Downloading $asset"
-    curl -fSL "https://github.com/$REPO/releases/download/v$VERSION/$asset" -o "$tmp/$asset" \
-        || die "Download failed. Is v$VERSION a published release?"
-    verify_download "$tmp" "$asset"
+    curl -fSL "https://github.com/$REPO/releases/download/v$LAZYCHAD_VERSION/$asset" -o "$WORK_DIR/$asset" \
+        || die "Download failed. Is v$LAZYCHAD_VERSION a published release?"
+    verify_download "$WORK_DIR" "$asset"
     info "Installing $asset"
     if [ "$family" = "debian" ]; then
-        sudo apt-get install -y "$tmp/$asset"
+        # Fresh images ship without package lists, so dependencies can't resolve.
+        sudo apt-get update || warn "apt-get update failed; trying the install anyway."
+        sudo apt-get install -y "$WORK_DIR/$asset"
     else
-        sudo dnf install -y "$tmp/$asset"
+        sudo dnf install -y "$WORK_DIR/$asset"
     fi
-    rm -rf "$tmp"
 }
 
-main() {
-    VERSION=""
-    local run_deps=true deps_args=()
+is_root() { [ "$EUID" -eq 0 ]; }
+
+os_release_field() {
+    # $1=field. Read in a subshell: sourcing os-release here would clobber
+    # this script's variables (it defines NAME, VERSION, ...).
+    local file="${OS_RELEASE_FILE:-/etc/os-release}"
+    [ -f "$file" ] || return 0
+    # shellcheck source=/dev/null
+    ( . "$file"; eval "printf '%s' \"\${$1:-}\"" )
+}
+
+usage() {
+    cat <<'USAGE'
+LazyChad one-line installer
+
+  curl -fsSL https://raw.githubusercontent.com/MistanKh/LazyChad/main/install.sh | bash
+  curl -fsSL https://raw.githubusercontent.com/MistanKh/LazyChad/main/install.sh | bash -s -- [options]
+
+Options:
+  --version X.Y.Z   Install a specific release instead of the latest (not on Arch)
+  --no-deps         Only install the package; skip 'lazychad-deps'
+  --gui, --nightly, --skip-nvim, --no-bootstrap
+                    Passed to lazychad-deps
+  -h, --help        Show this help
+USAGE
+}
+
+parse_args() {
+    LAZYCHAD_VERSION=""
+    RUN_DEPS=true
+    DEPS_ARGS=()
     while [ $# -gt 0 ]; do
         case "$1" in
-            --version) VERSION="${2:-}"; [ -n "$VERSION" ] || die "--version needs a value"; shift ;;
-            --no-deps) run_deps=false ;;
-            *)         deps_args+=("$1") ;;
+            --version)   LAZYCHAD_VERSION="${2:-}"; [ -n "$LAZYCHAD_VERSION" ] || die "--version needs a value"; shift ;;
+            --version=*) LAZYCHAD_VERSION="${1#--version=}" ;;
+            --no-deps)   RUN_DEPS=false ;;
+            --gui|--stable|--nightly|--skip-nvim|--no-bootstrap) DEPS_ARGS+=("$1") ;;
+            -h|--help)   usage; exit 0 ;;
+            *)           die "Unknown option: $1 (see --help)" ;;
         esac
         shift
     done
+    LAZYCHAD_VERSION="${LAZYCHAD_VERSION#v}"
+    if [ -n "$LAZYCHAD_VERSION" ] && ! [[ "$LAZYCHAD_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        die "--version expects X.Y.Z, got '$LAZYCHAD_VERSION'"
+    fi
+}
+
+main() {
+    parse_args "$@"
 
     [ "$(uname -s)" = "Linux" ] || die "LazyChad's installer supports Linux only."
-    [ "$EUID" -ne 0 ] || die "Run this as your normal user (not root); it uses sudo when needed."
+    ! is_root || die "Run this as your normal user (not root); it uses sudo when needed."
     command -v curl >/dev/null 2>&1 || die "curl is required."
 
-    local ID="" ID_LIKE=""
-    # shellcheck source=/dev/null
-    [ -f /etc/os-release ] && . /etc/os-release
-    local family
-    family="$(detect_family "$ID" "$ID_LIKE")"
-    [ "$family" != "unsupported" ] || die "Unsupported distro '$ID'. See the manual install steps: https://github.com/$REPO#option-4-manual-installation-any-linux"
+    local os_id os_like family
+    os_id="$(os_release_field ID)"
+    os_like="$(os_release_field ID_LIKE)"
+    family="$(detect_family "$os_id" "$os_like")"
+    [ "$family" != "unsupported" ] || die "Unsupported distro '$os_id'. See the manual install steps: https://github.com/$REPO#option-4-manual-installation"
 
-    echo -e "${BOLD}${BLUE}🚀 Installing LazyChad${NC} (${ID:-linux}, $family family)"
+    if [ "$family" = "fedora" ] && [ "$os_id" != "fedora" ] && ! epel_enabled; then
+        epel_help "$os_id"
+        die "EPEL is not enabled; enable it and re-run the installer."
+    fi
+
+    echo -e "${BOLD}${BLUE}🚀 Installing LazyChad${NC} (${os_id:-linux}, $family family)"
+
+    WORK_DIR="$(mktemp -d)"
+    trap 'rm -rf -- "${WORK_DIR:-}"' EXIT
 
     if [ "$family" = "arch" ]; then
-        [ -z "$VERSION" ] || warn "--version is ignored on Arch; the AUR package is always the latest release."
+        [ -z "$LAZYCHAD_VERSION" ] || warn "--version is ignored on Arch; the AUR package is always the latest release."
         install_arch
     else
-        if [ -z "$VERSION" ]; then
-            VERSION="$(latest_version)" || die "Could not determine the latest LazyChad release (network?)."
+        if [ -z "$LAZYCHAD_VERSION" ]; then
+            LAZYCHAD_VERSION="$(latest_version)" || die "Could not determine the latest LazyChad release (network?)."
         fi
         install_release_package "$family"
     fi
     echo -e "${GREEN}✅ LazyChad package installed.${NC}"
 
-    if [ "$run_deps" = true ]; then
+    local deps_ok=true
+    if [ "$RUN_DEPS" = true ]; then
         info "Running lazychad-deps (Neovim 0.12+, tools, plugins)"
-        lazychad-deps "${deps_args[@]+"${deps_args[@]}"}" \
-            || warn "lazychad-deps reported issues; see its summary above."
+        lazychad-deps "${DEPS_ARGS[@]+"${DEPS_ARGS[@]}"}" || deps_ok=false
     else
         warn "Skipped lazychad-deps. Run it before first use: lazychad-deps"
     fi
 
     echo
-    echo -e "${GREEN}${BOLD}✨ Done!${NC} Start LazyChad with: ${BOLD}lchad${NC}"
+    if [ "$deps_ok" = true ]; then
+        echo -e "${GREEN}${BOLD}✨ Done!${NC} Start LazyChad with: ${BOLD}lchad${NC}"
+    else
+        echo -e "${YELLOW}${BOLD}⚠️  Installed, but lazychad-deps reported issues${NC} (see its summary above)."
+        echo -e "   Fix them and re-run ${BOLD}lazychad-deps${NC}, then start LazyChad with ${BOLD}lchad${NC}."
+    fi
     echo -e "   Check your setup any time with: ${BOLD}lchad --doctor${NC}"
 }
 
