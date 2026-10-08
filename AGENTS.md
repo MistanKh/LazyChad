@@ -9,12 +9,12 @@ and uninstall.
 
 ## Commands
 
-- Check shell syntax:
-  `bash -n bin/* install.sh scripts/*.sh tests/*.sh`
+- Check shell syntax (`bash -n a b` only checks `a`, so loop):
+  `for f in bin/* install.sh scripts/*.sh tests/*.sh lazychad.install; do bash -n "$f" || echo "FAIL $f"; done`
 - Lint shell (CI runs this):
   `shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh`
-- Run shell tests:
-  `for t in tests/*.sh; do bash "$t" || break; done`
+- Run shell tests (non-zero exit if any fails):
+  `fail=0; for t in tests/*.sh; do bash "$t" >/dev/null || { echo "FAIL $t"; fail=1; }; done; [ $fail = 0 ]`
 - Format Lua (CI checks with `stylua --check`):
   `stylua init.lua lua`
 - Check that every file carrying the version agrees:
@@ -51,7 +51,9 @@ current source. Cite any recovered decision that affects a code change.
 - Do not remove or rewrite user Neovim config/data directories during
   development.
 - Package hooks must never delete user data on upgrade or plain removal; only
-  `apt purge` and `lazychad-uninstall` remove it.
+  `apt purge` and `lazychad-uninstall` remove it. The preinstall/postinstall
+  (deb) and rpm posttrans hooks also shield data from the wiping postrm of
+  packages <= 1.0.9; keep them POSIX `sh` (RPM runs scriptlets with /bin/sh).
 - Preserve `NVIM_APPNAME=LazyChad` isolation.
 - Keep `lazychad-nvim` tarball-first for Neovim and never add
   `apt-get remove neovim`.

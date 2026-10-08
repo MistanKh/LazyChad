@@ -12,7 +12,8 @@ jobs:
       - uses: actions/checkout@v5
 
       - name: Shell syntax
-        run: bash -n bin/* install.sh scripts/*.sh tests/*.sh
+        # `bash -n a b c` only checks a; check each file.
+        run: for f in bin/* install.sh scripts/*.sh tests/*.sh lazychad.install; do bash -n "$f" || exit 1; done
 
       - name: ShellCheck
         run: |
@@ -68,9 +69,28 @@ jobs:
         with:
           name: packages
 
-      - name: Install
+      # The published <= 1.0.9 packages wiped every user's data from their
+      # postrm during upgrades; the new preinst/postinst must protect it.
+      - name: Upgrade from the published v1.0.9 keeps user data
         run: |
           apt-get update
+          apt-get install -y curl ca-certificates
+          curl -fsSL -o /tmp/lazychad-1.0.9.deb \
+            https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad_1.0.9-1_all.deb
+          apt-get install -y /tmp/lazychad-1.0.9.deb
+          mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy /root/.config/LazyChad
+          touch /home/tester/.config/LazyChad/mine.lua /root/.config/LazyChad/mine.lua
+          # dpkg -i runs the old postrm even when the version is unchanged
+          dpkg -i ./lazychad_*.deb
+          test -f /home/tester/.config/LazyChad/mine.lua
+          test -d /home/tester/.local/share/LazyChad/lazy
+          test -f /root/.config/LazyChad/mine.lua
+          test -z "$(find /home /root -name '*.pkg-upgrade' -print -quit)"
+          apt-get purge -y lazychad
+          test ! -e /home/tester/.config/LazyChad
+
+      - name: Install
+        run: |
           apt-get install -y ./lazychad_*.deb
           test -x /usr/bin/lchad
           test -x /usr/bin/lazychad-deps
@@ -101,6 +121,18 @@ jobs:
         with:
           name: packages
 
+      - name: Upgrade from the published v1.0.9 keeps user data
+        run: |
+          dnf install -y https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad-1.0.9-1.noarch.rpm
+          mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy
+          touch /home/tester/.config/LazyChad/mine.lua
+          # a reinstall erases the old package, running its wiping %postun
+          dnf reinstall -y ./lazychad-*.rpm
+          test -f /home/tester/.config/LazyChad/mine.lua
+          test -d /home/tester/.local/share/LazyChad/lazy
+          test -z "$(find /home -name '*.pkg-upgrade' -print -quit)"
+          dnf remove -y lazychad
+
       - name: Install
         run: |
           dnf install -y ./lazychad-*.rpm
@@ -116,7 +148,7 @@ jobs:
           dnf remove -y lazychad
           test -f /home/tester/.config/LazyChad/mine.lua
 
-  # The real user flow: install the .deb, run lazychad-deps (Neovim nightly,
+  # The real user flow: install the .deb, run lazychad-deps (stable Neovim,
   # tools, plugins, Mason, parsers), then boot LazyChad and fail on any error.
   end-to-end:
     needs: build-packages

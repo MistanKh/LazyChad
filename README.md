@@ -25,7 +25,8 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 ## 📥 Installation
 
 ### ⚡ Quick install (recommended)
-One command for Arch, Debian/Ubuntu/Kali and Fedora/RHEL (plus derivatives):
+One command for Arch, Debian/Ubuntu/Kali and Fedora (plus derivatives; on
+RHEL/Rocky/Alma/Oracle, [enable EPEL](#option-3-fedora--rhel-rpm) first):
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MistanKh/LazyChad/main/install.sh | bash
 ```
@@ -38,8 +39,16 @@ Options go after `bash -s --`, e.g. add the Neovide GUI:
 ```bash
 curl -fsSL https://raw.githubusercontent.com/MistanKh/LazyChad/main/install.sh | bash -s -- --gui
 ```
-(`--version X.Y.Z` pins a release, `--no-deps` installs only the package, and
-any other flag is passed to `lazychad-deps`.)
+(`--version X.Y.Z` pins a release (not on Arch, where the AUR always has the
+latest), `--no-deps` installs only the package, and `--gui`, `--nightly`,
+`--skip-nvim` and `--no-bootstrap` are passed to `lazychad-deps`; `--help` lists
+them all.)
+
+> [!WARNING]
+> **Upgrading a `.deb`/`.rpm` from v1.0.9 or earlier?** Those versions deleted
+> every user's LazyChad config during upgrades. Newer packages move your data
+> aside while the old package's removal script runs and put it back afterwards,
+> but back up `~/.config/LazyChad` first to be safe.
 
 ### Installing by hand
 > [!IMPORTANT]
@@ -73,6 +82,15 @@ lazychad-deps   # required: installs Neovim 0.12+, tools and plugins
 *Note: `neovim` is a **recommended** (not required) dependency, so apt may pull in your distro's older Neovim — that's harmless. `lazychad-deps` then installs the latest stable Neovim to `/usr/local`, which shadows it via `PATH`. Keeping `neovim` a recommend (not a hard depend) is also what stops a system `neovim` removal from cascade-removing LazyChad.*
 
 ### Option 3: Fedora / RHEL (.rpm)
+On RHEL, Rocky, Alma and Oracle Linux, LazyChad's dependencies (ripgrep,
+fd-find, pynvim, ...) come from EPEL, so enable it first:
+```bash
+sudo dnf install -y epel-release && sudo dnf config-manager --set-enabled crb   # Rocky / Alma
+# RHEL: subscription-manager repos --enable codeready-builder-for-rhel-$(rpm -E %rhel)-$(arch)-rpms
+#       then dnf install https://dl.fedoraproject.org/pub/epel/epel-release-latest-$(rpm -E %rhel).noarch.rpm
+# Oracle Linux: dnf install oracle-epel-release-el$(rpm -E %rhel)
+```
+
 Download the latest `.rpm` package from our [Releases Page](https://github.com/MistanKh/LazyChad/releases) and install it:
 ```bash
 sudo dnf install ./lazychad-1.0.9-1.noarch.rpm
@@ -80,8 +98,12 @@ lazychad-deps   # required: installs Neovim 0.12+, tools and plugins
 ```
 *Note: `lazychad-deps` installs the latest stable Neovim via the bundled `lazychad-nvim` script (official release tarball) — no COPR repository needed.*
 
-### Option 4: Manual Installation (Any Linux)
-If you prefer to install manually, follow these steps:
+### Option 4: Manual Installation
+Works on any Linux. On distros outside the Arch, Debian and Fedora families
+(openSUSE, Alpine, Void, ...), `lazychad-deps` can't install system packages
+for you: first install `git curl tar unzip make gcc ripgrep fd nodejs npm
+python3` plus your distro's pynvim and `xclip` or `wl-clipboard`, then follow
+these steps.
 
 #### 1. Clone LazyChad
 Clone the repository into your config directory under the name `LazyChad` to keep it isolated.
@@ -187,10 +209,12 @@ lazychad-uninstall       # confirm + optional config backup, then remove
 lazychad-uninstall --yes # skip prompts (scripted use)
 ```
 
-This removes the bundled Neovim, the LazyChad binaries and files, and the
-per-user LazyChad directories (after offering a backup). It detects whether LazyChad was installed via
-`apt`/`pacman`/`dnf` (rpm) or manually and removes it the matching way. Shared tools
-(Node, Rust, Neovide, fonts) are **not** removed.
+This removes the LazyChad package, the bundled Neovim, and every user's
+LazyChad directories (after offering a backup of yours). It detects whether
+LazyChad was installed via `apt` (it purges), `pacman`, `dnf`/`zypper` (rpm) or
+manually and removes it the matching way. If the package manager fails (for
+example because it is locked), it stops before touching Neovim or anyone's data.
+Shared tools (Node, Rust, Neovide, fonts) are **not** removed.
 
 <details>
 <summary>Manual removal (if you didn't install the <code>lazychad-uninstall</code> script)</summary>

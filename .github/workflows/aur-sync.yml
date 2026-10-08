@@ -26,11 +26,13 @@ jobs:
 
       - name: Check version consistency
         run: |
-          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            bash scripts/check-version.sh "$GITHUB_REF_NAME"
-          else
-            bash scripts/check-version.sh
+          # The PKGBUILD builds the tagged tarball, so only a tag may publish:
+          # a run from a branch would ship new metadata over old code.
+          if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
+            echo "::error::Run AUR Sync from a release tag (Use workflow from -> Tags -> vX.Y.Z)."
+            exit 1
           fi
+          bash scripts/check-version.sh "$GITHUB_REF_NAME"
 
       - name: Update checksums, .SRCINFO and Push to AUR
         run: |
