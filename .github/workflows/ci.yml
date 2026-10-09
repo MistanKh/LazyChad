@@ -13,12 +13,12 @@ jobs:
 
       - name: Shell syntax
         # `bash -n a b c` only checks a; check each file.
-        run: for f in bin/* install.sh scripts/*.sh tests/*.sh lazychad.install; do bash -n "$f" || exit 1; done
+        run: for f in bin/* install.sh scripts/*.sh tests/*.sh .github/scripts/*.sh lazychad.install; do bash -n "$f" || exit 1; done
 
       - name: ShellCheck
         run: |
           shellcheck --version
-          shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh
+          shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh .github/scripts/*.sh
           shellcheck -s bash -S warning lazychad.install
 
       - name: Shell tests
@@ -156,6 +156,51 @@ jobs:
           test -f /home/tester/.config/LazyChad/mine.lua
           dnf remove -y lazychad
           test -f /home/tester/.config/LazyChad/mine.lua
+
+  # The same user flow on a fresh container of each supported distro family:
+  # package install (PKGBUILD build on Arch), lazychad-deps as a normal sudo
+  # user, doctor, stable Neovim + checksum + Nerd Font, headless boot.
+  distro-e2e:
+    needs: build-packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: debian
+            image: debian:stable
+          - name: kali
+            image: kalilinux/kali-rolling
+          - name: fedora
+            image: fedora:latest
+          - name: rocky
+            image: rockylinux/rockylinux:9
+          - name: arch
+            image: archlinux:latest
+    name: distro-e2e (${{ matrix.name }})
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: packages
+          path: dist
+
+      - name: Install, set up and boot LazyChad
+        run: bash .github/scripts/distro-e2e.sh dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload deps log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lazychad-deps-log-${{ matrix.name }}
+          path: /home/tester/.local/state/LazyChad/lazychad-deps.log
+          if-no-files-found: ignore
 
   # The real user flow: install the .deb, run lazychad-deps (stable Neovim,
   # tools, plugins, Mason, parsers), then boot LazyChad and fail on any error.

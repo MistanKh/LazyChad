@@ -10,9 +10,9 @@ and uninstall.
 ## Commands
 
 - Check shell syntax (`bash -n a b` only checks `a`, so loop):
-  `for f in bin/* install.sh scripts/*.sh tests/*.sh lazychad.install; do bash -n "$f" || echo "FAIL $f"; done`
+  `for f in bin/* install.sh scripts/*.sh tests/*.sh .github/scripts/*.sh lazychad.install; do bash -n "$f" || echo "FAIL $f"; done`
 - Lint shell (CI runs this):
-  `shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh`
+  `shellcheck -S warning bin/* install.sh scripts/*.sh tests/*.sh .github/scripts/*.sh`
 - Run shell tests (non-zero exit if any fails):
   `fail=0; for t in tests/*.sh; do bash "$t" >/dev/null || { echo "FAIL $t"; fail=1; }; done; [ $fail = 0 ]`
 - Format Lua (CI checks with `stylua --check`):
