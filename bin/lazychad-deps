@@ -395,6 +395,23 @@ fetch_tree_sitter_binary() {
         fi
     fi
     rm -rf "$tmp"
+    tree_sitter_runs && return 0
+    build_tree_sitter_from_source "$ver"
+}
+
+build_tree_sitter_from_source() {
+    # $1=version. The prebuilt binary needs a recent glibc (2.39 for 0.27);
+    # older distros (Ubuntu 22.04, Debian 12, RHEL/Rocky 9) build it instead.
+    local ver="$1" pkg="$NODE_PREFIX/node_modules/tree-sitter-cli" root
+    [ -n "$ver" ] || return 1
+    echo -e "${BLUE}The prebuilt tree-sitter needs a newer glibc than this system has;${NC}"
+    echo -e "${BLUE}building tree-sitter $ver from source (one-time, a few minutes)...${NC}"
+    install_rust || return 1
+    root="$(mktemp -d)"
+    if cargo install --locked --root "$root" "tree-sitter-cli@$ver"; then
+        install -m 755 "$root/bin/tree-sitter" "$pkg/tree-sitter"
+    fi
+    rm -rf "$root"
     tree_sitter_runs
 }
 
@@ -446,7 +463,7 @@ step_python_provider() {
 
 install_rust() {
     exists cargo && return 0
-    echo -e "${BLUE}Installing Rust via rustup (needed to build Neovide)...${NC}"
+    echo -e "${BLUE}Installing Rust via rustup (to build from source)...${NC}"
     if curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y; then
         # shellcheck source=/dev/null
         [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"

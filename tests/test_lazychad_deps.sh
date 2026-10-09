@@ -62,4 +62,25 @@ assert_eq "$(
 )" "tree-sitter 0.27.1" "tree-sitter binary is fetched when npm skipped it"
 command rm -rf "${ts:?}"
 
+# ...and when the prebuilt binary can't run (old glibc), it is built with cargo
+ts="$(mktemp -d)"
+mkdir -p "$ts/node_modules/tree-sitter-cli" "$ts/node_modules/.bin"
+printf '{\n  "name": "tree-sitter-cli",\n  "version": "0.27.1"\n}\n' > "$ts/node_modules/tree-sitter-cli/package.json"
+printf '#!/bin/sh\nexec "$(dirname "$0")/../tree-sitter-cli/tree-sitter" "$@"\n' > "$ts/node_modules/.bin/tree-sitter"
+chmod +x "$ts/node_modules/.bin/tree-sitter"
+assert_eq "$(
+  NODE_PREFIX="$ts"
+  node() { return 1; }
+  uname() { echo x86_64; }
+  curl() { return 22; }
+  install_rust() { return 0; }
+  cargo() {
+    local root="" a prev=""; for a in "$@"; do [ "$prev" = "--root" ] && root="$a"; prev="$a"; done
+    [ "$*" = "install --locked --root $root tree-sitter-cli@0.27.1" ] || return 1
+    mkdir -p "$root/bin"; printf '#!/bin/sh\necho "tree-sitter 0.27.1 (built)"\n' > "$root/bin/tree-sitter"
+  }
+  fetch_tree_sitter_binary >/dev/null && "$NODE_PREFIX/node_modules/.bin/tree-sitter" --version
+)" "tree-sitter 0.27.1 (built)" "tree-sitter is built from source when no prebuilt binary runs"
+command rm -rf "${ts:?}"
+
 exit $fail
