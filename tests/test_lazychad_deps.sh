@@ -41,4 +41,25 @@ set_family_packages
 assert_eq "$(printf '%s\n' "${NEOVIDE_BUILD_DEPS[@]}" | grep -c multilib)" "2" "multilib packages on x86_64"
 unset -f uname apt-cache
 
+# tree-sitter CLI: npm skipped the install script and running it fails too,
+# so the binary is downloaded directly
+ts="$(mktemp -d)"
+mkdir -p "$ts/node_modules/tree-sitter-cli" "$ts/node_modules/.bin" "$ts/payload"
+printf '{\n  "name": "tree-sitter-cli",\n  "version": "0.27.1"\n}\n' > "$ts/node_modules/tree-sitter-cli/package.json"
+printf '#!/bin/sh\nexec "$(dirname "$0")/../tree-sitter-cli/tree-sitter" "$@"\n' > "$ts/node_modules/.bin/tree-sitter"
+chmod +x "$ts/node_modules/.bin/tree-sitter"
+printf '#!/bin/sh\necho "tree-sitter 0.27.1"\n' > "$ts/payload/tree-sitter"
+gzip -c "$ts/payload/tree-sitter" > "$ts/payload/tree-sitter-linux-x64.gz"
+assert_eq "$(
+  NODE_PREFIX="$ts"
+  node() { return 1; }
+  uname() { echo x86_64; }
+  github_api() { return 1; }
+  curl() { local out="" a prev=""; for a in "$@"; do [ "$prev" = "-o" ] && out="$a"; prev="$a"; done
+           case "$*" in *v0.27.1/tree-sitter-linux-x64.gz*) cp "$ts/payload/tree-sitter-linux-x64.gz" "$out" ;; *) return 22 ;; esac; }
+  tree_sitter_runs && echo before
+  fetch_tree_sitter_binary && "$NODE_PREFIX/node_modules/.bin/tree-sitter" --version
+)" "tree-sitter 0.27.1" "tree-sitter binary is fetched when npm skipped it"
+command rm -rf "${ts:?}"
+
 exit $fail

@@ -24,7 +24,7 @@ chmod +x "$tmp/bin/nvim"
 
 run_lchad() {
     # $@ = lchad args; isolated HOME/XDG, stub nvim first on PATH
-    env -i HOME="${tmp:?}/home" PATH="$tmp/bin:/usr/bin:/bin" NVIM_LOG="$tmp/nvim.log" \
+    env -i HOME="${tmp:?}/home" PATH="$tmp/bin:/usr/bin:/bin" NVIM_LOG="$tmp/nvim.log" LAZYCHAD_NVIM="$tmp/bin/nvim" \
         LAZYCHAD_SYSTEM_DIR="$tmp/sys" bash "$LCHAD" "$@"
 }
 

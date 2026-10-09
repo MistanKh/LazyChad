@@ -34,15 +34,28 @@ nvim_release_url() {
     echo "https://github.com/neovim/neovim/releases/download/$2/$1.tar.gz"
 }
 
+nvim_bin() {
+    # The Neovim LazyChad uses: the /usr/local copy this script manages,
+    # else whatever is on PATH.
+    if [ -x /usr/local/bin/nvim ]; then
+        echo /usr/local/bin/nvim
+    else
+        command -v nvim 2>/dev/null
+    fi
+}
+
 get_installed_version() {
-    command -v nvim >/dev/null 2>&1 || { echo "none"; return; }
-    nvim --version 2>/dev/null | head -1 | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' || echo "none"
+    local bin
+    bin="$(nvim_bin)" || { echo "none"; return; }
+    "$bin" --version 2>/dev/null | sed -n 1p | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' || echo "none"
 }
 
 get_installed_build() {
     # Full first line of `nvim --version` (incl. nightly -dev+g<hash>), or "none".
-    command -v nvim >/dev/null 2>&1 || { echo "none"; return; }
-    nvim --version 2>/dev/null | head -1 || echo "none"
+    local bin line
+    bin="$(nvim_bin)" || { echo "none"; return; }
+    line="$("$bin" --version 2>/dev/null | sed -n 1p)"
+    echo "${line:-none}"
 }
 
 version_ge_min() {
@@ -105,14 +118,14 @@ verify_sha256() {
 
 get_latest_version() {
     curl -fsSL https://github.com/neovim/neovim/releases/latest \
-        | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | head -1 || echo ""
+        | grep -oP 'releases/tag/v\K[0-9]+\.[0-9]+\.[0-9]+' | sed -n 1p || echo ""
 }
 
 get_latest_nightly_hash() {
     # The nightly release body carries the exact build string, e.g.
     # "NVIM v0.13.0-dev-752+gb8e3f3f4e0" -> we extract the g<hash>.
     github_api https://api.github.com/repos/neovim/neovim/releases/tags/nightly 2>/dev/null \
-        | grep -oiP 'NVIM v[0-9.]+-dev-[0-9]+\+g\K[0-9a-f]{7,}' | head -1 || echo ""
+        | grep -oiP 'NVIM v[0-9.]+-dev-[0-9]+\+g\K[0-9a-f]{7,}' | sed -n 1p || echo ""
 }
 
 # ---- actions ----
@@ -160,14 +173,27 @@ native_install_neovim() {
 }
 
 verify_min() {
-    # Print the installed version line; succeed only if it's >= the minimum.
-    local v; v="$(get_installed_version)"
-    nvim --version 2>/dev/null | head -1 || true
-    if version_ge_min "$v"; then
+    # $1 = binary to check (default: the nvim on PATH). Prints its version
+    # line; succeeds only if it's >= the minimum.
+    local bin="${1:-nvim}" line v
+    line="$("$bin" --version 2>/dev/null | sed -n 1p)"
+    echo "$line"
+    v="$(printf '%s' "$line" | grep -oP 'v?\K[0-9]+\.[0-9]+\.[0-9]+' || true)"
+    if version_ge_min "${v:-none}"; then
         return 0
     fi
-    echo -e "${RED}⚠️ Installed Neovim is v${v}, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}"
+    echo -e "${RED}⚠️ Installed Neovim is v${v:-none}, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}"
     return 1
+}
+
+warn_path_order() {
+    # lchad always uses /usr/local/bin/nvim; tell users whose shell picks another.
+    local first
+    first="$(command -v nvim 2>/dev/null || true)"
+    if [ -n "$first" ] && [ "$first" != /usr/local/bin/nvim ]; then
+        echo -e "${YELLOW}Note: '$first' comes before /usr/local/bin/nvim on your PATH. lchad uses${NC}"
+        echo -e "${YELLOW}      /usr/local/bin/nvim; put /usr/local/bin first to get it for plain 'nvim' too.${NC}"
+    fi
 }
 
 native_fallback() {
@@ -244,8 +270,9 @@ install_stable() {
 
     cleanup_manual
     note_apt_neovim
-    if install_tarball "$asset" "v$latest" "v$latest" && verify_min; then
+    if install_tarball "$asset" "v$latest" "v$latest" && verify_min /usr/local/bin/nvim; then
         echo -e "${GREEN}✅ Neovim v$latest installed to /usr/local.${NC}"
+        warn_path_order
         return 0
     fi
 
@@ -272,8 +299,9 @@ install_nightly() {
 
     cleanup_manual
     note_apt_neovim
-    if install_tarball "$asset" "nightly" "nightly" && verify_min; then
+    if install_tarball "$asset" "nightly" "nightly" && verify_min /usr/local/bin/nvim; then
         echo -e "${GREEN}✅ Neovim nightly installed to /usr/local.${NC}"
+        warn_path_order
         return 0
     fi
 

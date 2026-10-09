@@ -98,6 +98,14 @@ assert_eq "$(
   install_stable nvim-linux-x86_64 2>/dev/null | grep -c INSTALLED
 )" "1" "a 0.13.0-dev nightly is replaced by stable 0.13.0"
 
+# verify_min checks the binary it is given, not whatever is first on PATH
+vm="$(mktemp -d)"
+printf '#!/bin/sh\necho "NVIM v0.12.5"\n' > "$vm/new"; printf '#!/bin/sh\necho "NVIM v0.8.0"\n' > "$vm/old"
+chmod +x "$vm/new" "$vm/old"; ln -s "$vm/old" "$vm/nvim"
+assert_eq "$(PATH="$vm:$PATH" verify_min "$vm/new" >/dev/null 2>&1 && echo ok || echo bad)" "ok" "verify_min checks the installed binary"
+assert_eq "$(PATH="$vm:$PATH" verify_min >/dev/null 2>&1 && echo ok || echo bad)" "bad" "verify_min on PATH still catches an old nvim"
+command rm -rf "${vm:?}"
+
 # unknown arguments never fall through to an install
 assert_eq "$( (main bogus) >/dev/null 2>&1; echo $?)" "2" "unknown argument exits 2 instead of installing"
 assert_eq "$(install_or_update() { echo INSTALL; }; uninstall_nvim() { echo UNINSTALL; }; main uninstall 2>/dev/null)" "UNINSTALL" \

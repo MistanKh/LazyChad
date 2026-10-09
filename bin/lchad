@@ -30,8 +30,22 @@ confirm_yes() {
     [[ -z "$reply" || "$reply" =~ ^[Yy] ]]
 }
 
+resolve_nvim() {
+    # lazychad-nvim installs to /usr/local/bin to shadow an older distro
+    # Neovim; use it even when PATH lists /usr/bin first (sudo secure_path,
+    # unusual shell setups). LAZYCHAD_NVIM overrides both.
+    if [ -n "${LAZYCHAD_NVIM:-}" ]; then
+        NVIM="$LAZYCHAD_NVIM"
+    elif [ -x /usr/local/bin/nvim ]; then
+        NVIM=/usr/local/bin/nvim
+    else
+        NVIM="$(command -v nvim 2>/dev/null || true)"
+    fi
+    [ -n "$NVIM" ]
+}
+
 nvim_version() {
-    nvim --version 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | head -1
+    "$NVIM" --version 2>/dev/null | sed -n 1p | grep -oE '[0-9]+\.[0-9]+(\.[0-9]+)?' | sed -n 1p
 }
 
 version_ok() {
@@ -123,12 +137,12 @@ run_setup() {
 }
 
 ensure_nvim() {
-    command -v nvim >/dev/null 2>&1 && return 0
+    resolve_nvim && return 0
     echo -e "${RED}❌ Neovim is not installed (or not on your PATH).${NC}" >&2
     if is_tty && confirm_yes "Run 'lazychad-deps' now to install Neovim 0.12+ and the tools LazyChad needs?"; then
         run_setup
         hash -r
-        command -v nvim >/dev/null 2>&1 && return 0
+        resolve_nvim && return 0
     fi
     echo "Run 'lazychad-deps' to install Neovim 0.12+ and the providers," >&2
     echo "or 'lazychad-nvim' to install just Neovim." >&2
@@ -153,7 +167,7 @@ run_bootstrap() {
     local lua_file
     echo -e "${BLUE}📦 Installing LazyChad plugins (one-time setup)...${NC}" >&2
     # Every headless call ends with a quit, so an error can never leave it hanging.
-    if ! nvim --headless "+Lazy! sync" "+qa"; then
+    if ! "$NVIM" --headless "+Lazy! sync" "+qa"; then
         echo -e "${RED}⚠️ Plugin install failed (network?). Re-run 'lchad --bootstrap'.${NC}" >&2
         return 1
     fi
@@ -163,7 +177,7 @@ run_bootstrap() {
         return 1
     fi
     echo -e "${BLUE}🧰 Installing language tools and parsers...${NC}" >&2
-    if ! nvim --headless "+lua dofile([[$lua_file]]).run()" "+cquit 1"; then
+    if ! "$NVIM" --headless "+lua dofile([[$lua_file]]).run()" "+cquit 1"; then
         echo -e "${YELLOW}⚠️ Some tools could not be installed. Re-run 'lchad --bootstrap' or check :Mason.${NC}" >&2
         return 1
     fi
@@ -194,10 +208,10 @@ doctor() {
     echo -e "${BOLD}=== LazyChad Doctor ===${NC}"
 
     echo -e "${BOLD}Neovim${NC}"
-    if command -v nvim >/dev/null 2>&1; then
+    if resolve_nvim; then
         v="$(nvim_version)"
         if version_ok "$v"; then
-            dr_ok "Neovim $v ($(command -v nvim))"
+            dr_ok "Neovim $v ($NVIM)"
         else
             dr_bad "Neovim ${v:-unknown} is older than ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR} — run 'lazychad-nvim'"
         fi
@@ -228,7 +242,9 @@ doctor() {
     echo -e "${BOLD}Language tooling${NC}"
     dr_recommend node "Node-based language servers"
     dr_recommend npm "Node-based language servers"
-    if command -v tree-sitter >/dev/null 2>&1 || [ -x "$LAZYCHAD_DATA/node/node_modules/.bin/tree-sitter" ]; then
+    # run it: the npm wrapper exists even when its binary was never downloaded
+    if "$LAZYCHAD_DATA/node/node_modules/.bin/tree-sitter" --version >/dev/null 2>&1 \
+       || tree-sitter --version >/dev/null 2>&1; then
         dr_ok "tree-sitter CLI"
     else
         dr_warn "tree-sitter CLI missing (parser installs) — run 'lazychad-deps'"
@@ -319,7 +335,7 @@ main() {
     fi
 
     # Run Neovim and pass all arguments ($@)
-    exec nvim "$@"
+    exec "$NVIM" "$@"
 }
 
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then

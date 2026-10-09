@@ -69,8 +69,10 @@ esac
 command -v lchad lazychad-deps lazychad-nvim lazychad-uninstall
 echo "::endgroup::"
 
-# Everything a user runs, as that user.
-sudo -u "$TEST_USER" -H --preserve-env=GITHUB_TOKEN bash -l <<'USER_STEPS'
+# Everything a user runs, as that user, with a normal login PATH (sudo's
+# secure_path on Fedora/RHEL would otherwise drop /usr/local/bin).
+sudo -u "$TEST_USER" -H --preserve-env=GITHUB_TOKEN \
+    env PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/usr/sbin bash -l <<'USER_STEPS'
 set -euo pipefail
 cd ~
 
@@ -80,10 +82,14 @@ echo "::endgroup::"
 
 echo "::group::Checks"
 lchad --doctor
-nvim --version | head -1
-nvim --version | head -1 | grep -qv -- '-dev'                     # stable Neovim
-grep -F "Checksum verified." ~/.local/state/LazyChad/lazychad-deps.log
+# sed, not head: head closes the pipe early and pipefail fails the line
+first="$(nvim --version | sed -n 1p)"
+echo "$first"
+case "$first" in *-dev*) echo "expected a stable Neovim"; exit 1 ;; esac
+# the tarball was verified, unless the distro already ships the latest stable
+grep -E "Checksum verified\.|Already on the latest stable" ~/.local/state/LazyChad/lazychad-deps.log
 fc-list | grep -i "JetBrainsMono Nerd Font"
+~/.local/share/LazyChad/node/node_modules/.bin/tree-sitter --version
 echo "::endgroup::"
 
 echo "::group::Boot without errors"

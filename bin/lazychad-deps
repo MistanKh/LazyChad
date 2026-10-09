@@ -365,6 +365,39 @@ step_system_packages() {
     fi
 }
 
+tree_sitter_runs() {
+    "$NODE_PREFIX/node_modules/.bin/tree-sitter" --version >/dev/null 2>&1
+}
+
+fetch_tree_sitter_binary() {
+    # Newer npm releases can skip tree-sitter-cli's install script, which is
+    # what downloads the real binary. Run it ourselves, and failing that,
+    # download the same release asset directly (checksum-verified).
+    local pkg="$NODE_PREFIX/node_modules/tree-sitter-cli" ver arch asset tmp expected actual
+    [ -d "$pkg" ] || return 1
+    (cd "$pkg" && node install.js) >/dev/null 2>&1 && tree_sitter_runs && return 0
+
+    ver="$(sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' "$pkg/package.json" | head -1)"
+    case "$(uname -m)" in
+        x86_64|amd64)  arch=x64 ;;
+        aarch64|arm64) arch=arm64 ;;
+        *) return 1 ;;
+    esac
+    asset="tree-sitter-linux-$arch.gz"
+    tmp="$(mktemp -d)"
+    if curl -fsSL "https://github.com/tree-sitter/tree-sitter/releases/download/v$ver/$asset" -o "$tmp/$asset"; then
+        if github_api "https://api.github.com/repos/tree-sitter/tree-sitter/releases/tags/v$ver" >"$tmp/release.json" 2>/dev/null; then
+            expected="$(release_asset_digest "$tmp/release.json" "$asset")"
+        fi
+        actual="$(sha256sum "$tmp/$asset" | awk '{ print $1 }')"
+        if [ -z "${expected:-}" ] || [ "$actual" = "$expected" ]; then
+            gzip -dc "$tmp/$asset" > "$pkg/tree-sitter" && chmod 755 "$pkg/tree-sitter"
+        fi
+    fi
+    rm -rf "$tmp"
+    tree_sitter_runs
+}
+
 step_node_tools() {
     # Private npm prefix: no root-owned files, no clash with the user's global
     # npm packages. options.lua points Neovim at these.
@@ -375,12 +408,19 @@ step_node_tools() {
     fi
     mkdir -p "$NODE_PREFIX"
     echo -e "${BLUE}Installing neovim + tree-sitter-cli into $NODE_PREFIX...${NC}"
-    if npm install --prefix "$NODE_PREFIX" --no-fund --no-audit --loglevel=error \
+    if ! npm install --prefix "$NODE_PREFIX" --no-fund --no-audit --loglevel=error \
             neovim@latest tree-sitter-cli@latest; then
-        echo -e "${GREEN}✅ Node provider and tree-sitter CLI ready.${NC}"
-    else
         warn_fail "npm install of neovim/tree-sitter-cli failed"
+        return 0
     fi
+    if ! tree_sitter_runs; then
+        echo -e "${BLUE}npm skipped the tree-sitter binary download; fetching it...${NC}"
+        fetch_tree_sitter_binary || {
+            warn_fail "tree-sitter CLI could not be installed (needed to build parsers)"
+            return 0
+        }
+    fi
+    echo -e "${GREEN}✅ Node provider and tree-sitter CLI ready.${NC}"
 }
 
 step_python_provider() {
