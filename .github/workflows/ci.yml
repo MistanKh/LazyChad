@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+  schedule:
+    # weekly, Monday 06:17 UTC
+    - cron: '17 6 * * 1'
 
 jobs:
   lint-and-test:
@@ -32,7 +35,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: 2.5.2
-          args: --check init.lua lua
+          args: --check init.lua lua templates
 
   build-packages:
     runs-on: ubuntu-latest
@@ -157,92 +160,42 @@ jobs:
           dnf remove -y lazychad
           test -f /home/tester/.config/LazyChad/mine.lua
 
-  # The same user flow on a fresh container of each supported distro family:
-  # package install (PKGBUILD build on Arch), lazychad-deps as a normal sudo
-  # user, doctor, stable Neovim + checksum + Nerd Font, headless boot.
-  distro-e2e:
+  # Full install, setup and boot on fresh Ubuntu, Debian, Kali, Fedora,
+  # Rocky and Arch containers (see e2e.yml).
+  e2e:
     needs: build-packages
+    uses: ./.github/workflows/e2e.yml
+    with:
+      packages-artifact: packages
+
+  # The weekly run catches breakage from upstream (Neovim, npm, Mason,
+  # distros) even when nothing here changed; make it visible as an issue.
+  weekly-report:
+    if: always() && github.event_name == 'schedule'
+    needs: [lint-and-test, build-packages, deb-lifecycle, rpm-lifecycle, e2e]
     runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: debian
-            image: debian:stable
-          - name: kali
-            image: kalilinux/kali-rolling
-          - name: fedora
-            image: fedora:latest
-          - name: rocky
-            image: rockylinux/rockylinux:9
-          - name: arch
-            image: archlinux:latest
-    name: distro-e2e (${{ matrix.name }})
-    container:
-      image: ${{ matrix.image }}
+    permissions:
+      contents: read
+      issues: write
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/download-artifact@v7
-        with:
-          name: packages
-          path: dist
-
-      - name: Install, set up and boot LazyChad
-        run: bash .github/scripts/distro-e2e.sh dist
+      - name: Open, update or close the "Weekly CI is failing" issue
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload deps log
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: lazychad-deps-log-${{ matrix.name }}
-          path: /home/tester/.local/state/LazyChad/lazychad-deps.log
-          if-no-files-found: ignore
-
-  # The real user flow: install the .deb, run lazychad-deps (stable Neovim,
-  # tools, plugins, Mason, parsers), then boot LazyChad and fail on any error.
-  end-to-end:
-    needs: build-packages
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/download-artifact@v7
-        with:
-          name: packages
-
-      - name: Install package
-        run: sudo apt-get install -y ./lazychad_*.deb
-
-      - name: lazychad-deps
-        run: lazychad-deps
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Stable Neovim and Nerd Font installed
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          nvim --version | head -1
-          nvim --version | head -1 | grep -qv -- '-dev'
-          fc-list | grep -i "JetBrainsMono Nerd Font"
-          # The download must have been verified, not skipped.
-          grep -F "Checksum verified." ~/.local/state/LazyChad/lazychad-deps.log
-
-      - name: Doctor
-        run: lchad --doctor
-
-      - name: Boot without errors
-        run: |
-          printf 'local x = 1\nreturn x\n' > sample.lua
-          lchad --headless sample.lua \
-            -c 'sleep 5' \
-            -c 'lua if vim.v.errmsg ~= "" then io.stderr:write("startup error: " .. vim.v.errmsg .. "\n") vim.cmd "cquit 1" end' \
-            -c 'qa!'
-
-      - name: Upload deps log
-        if: always()
-        uses: actions/upload-artifact@v6
-        with:
-          name: lazychad-deps-log
-          path: ~/.local/state/LazyChad/lazychad-deps.log
+          title="Weekly CI is failing"
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
+          if [ "$FAILED" = true ]; then
+            if [ -n "$existing" ]; then
+              gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "Still failing: $RUN_URL"
+            else
+              gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$(printf '%s\n\n%s\n%s' \
+                "The scheduled CI run failed: $RUN_URL" \
+                "Something upstream (Neovim, a plugin, npm, Mason or a distro image) probably changed." \
+                "This issue closes itself when a scheduled run passes again.")"
+            fi
+          elif [ -n "$existing" ]; then
+            gh issue close "$existing" --repo "$GITHUB_REPOSITORY" --comment "Passing again: $RUN_URL"
+          fi

@@ -14,7 +14,8 @@ LazyChad is a high-performance, aesthetically pleasing Neovim configuration buil
 - **⚡ Zero Hardcoding**: No more maintaining long lists of tools. LazyChad understands your files and finds the best tools available in real-time.
 - **🛡️ Failure Resilience**: Built-in blacklisting prevents repeated failed tool-install attempts during toolchain setup.
 - **🛡️ Cross-Distro Intelligence**: Bundles `lazychad-nvim`, which installs the latest stable Neovim (LazyChad needs 0.12+) from the official GitHub release tarball, checksum-verified, on any distro (x86_64 / arm64) — no PPAs, COPRs, or AppImages to break, and no fight with an outdated repo package.
-- **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup.
+- **🔄 Smart Synchronization**: Automatically detects system updates and prompts you to refresh your local configuration with a safe, timestamped backup. Your own settings in `lua/user/` are always kept.
+- **📌 Tested Plugin Versions**: Plugins are pinned to versions tested on every supported distro, so a broken upstream release never reaches you. The pins are refreshed and re-tested weekly.
 - **💎 Luminous Aesthetics**: Custom "Intelligence Report" dashboard with real-time toolchain status and the beautiful Rose Pine theme.
 - **🖼️ Neovide Optimized**: Pre-configured for the **Neovide** GUI with smooth 120Hz animations, "pixiedust" cursor effects, and perfect typography.
 - **🔡 Typography Ready**: Out-of-the-box support for **JetBrainsMono Nerd Font** for perfect icons and coding clarity.
@@ -167,7 +168,9 @@ It only installs what LazyChad needs:
 Run `lchad`. If a system-wide update is detected, LazyChad will automatically prompt:
 `🔔 System update detected (v1.3.7 -> v1.3.8)!`
 
-Press `y` to sync. Your old configuration will be safely backed up to a timestamped folder in `~/.config/`.
+Press Enter (or `y`) to sync. It installs the new LazyChad files and the plugin
+versions tested for that release. Your `lua/user/` folder is kept as is; anything
+else you changed is backed up to a timestamped folder in `~/.config/`.
 Package upgrades and removals never delete your config; only `apt purge` or `lazychad-uninstall` does.
 
 ### Step 3: Refresh Toolchain
@@ -247,8 +250,28 @@ Plugins, base Mason tools and parsers are already installed by `lazychad-deps`
 (if you skipped it, the first `lchad` launch installs them before opening).
 
 1.  **Open a File**: Open any code file (e.g., `lchad main.py`).
-2.  **Pick Your Tools**: LazyChad will automatically prompt you to choose an LSP, Formatter, and Linter.
-    Change them later with `:LspPick`, `:FormatPick` and `:LintPick`.
+2.  **Pick Your Tools**: LazyChad prompts you to choose an LSP, formatter and linter
+    for each new file type. Pick **"Always use the recommended tools"** once and it
+    chooses the recommended ones for you from then on (with a short notice), only
+    asking when there is no recommendation. Change a choice any time with
+    `:LspPick`, `:FormatPick` and `:LintPick`; turn auto-picking on or off with
+    `:LazyChadAutoPick on|off`.
+
+### Your own settings: `lua/user/`
+LazyChad creates `~/.config/LazyChad/lua/user/` for you. It is yours: LazyChad
+never overwrites it, even when it refreshes your config after an upgrade.
+
+| File | For |
+| --- | --- |
+| `lua/user/init.lua` | options, keymaps, autocmds (loaded last, so they win) |
+| `lua/user/plugins/*.lua` | extra plugins, as [lazy.nvim](https://lazy.folke.io/spec) specs |
+| `lua/user/chadrc.lua` | NvChad settings merged over LazyChad's, e.g. `return { base46 = { theme = "catppuccin" } }` |
+
+### Plugin versions
+Plugins are pinned by `lazy-lock.json` to versions tested on every supported
+distro; `lazychad-deps` and the post-upgrade refresh install exactly those.
+You can still run `:Lazy update` to move to the newest plugins yourself; the
+next LazyChad upgrade puts you back on its tested versions.
 
 ### Handy commands
 ```bash

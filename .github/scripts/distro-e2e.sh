@@ -90,14 +90,30 @@ case "$first" in *-dev*) echo "expected a stable Neovim"; exit 1 ;; esac
 grep -E "Checksum verified\.|Already on the latest stable" ~/.local/state/LazyChad/lazychad-deps.log
 fc-list | grep -i "JetBrainsMono Nerd Font"
 ~/.local/share/LazyChad/node/node_modules/.bin/tree-sitter --version
+
+# plugins sit on the commits pinned by lazy-lock.json
+lock=~/.config/LazyChad/lazy-lock.json
+for plugin in NvChad lazy.nvim; do
+    pinned="$(sed -n "s/.*\"$plugin\": *{.*\"commit\": *\"\([0-9a-f]*\)\".*/\1/p" "$lock")"
+    [ -n "$pinned" ] || { echo "$plugin: not pinned in $lock (placeholder lockfile?)"; continue; }
+    actual="$(git -C ~/.local/share/LazyChad/lazy/"$plugin" rev-parse HEAD)"
+    [ "$actual" = "$pinned" ] || { echo "$plugin is at $actual but the lockfile pins $pinned"; exit 1; }
+    echo "$plugin pinned at $pinned"
+done
+test -f ~/.config/LazyChad/lua/user/init.lua                     # user folder created
 echo "::endgroup::"
 
-echo "::group::Boot without errors"
+echo "::group::Boot without errors (auto-pick on)"
+printf '{"auto_pick":true}\n' > ~/.local/share/LazyChad/lazychad_settings.json
 printf 'local x = 1\nreturn x\n' > sample.lua
 lchad --headless sample.lua \
-    -c 'sleep 5' \
+    -c 'sleep 10' \
     -c 'lua if vim.v.errmsg ~= "" then io.stderr:write("startup error: " .. vim.v.errmsg .. "\n") vim.cmd "cquit 1" end' \
     -c 'qa!'
+# auto-pick chose the recommended Lua tools without any popup
+grep -F '"lua":"lua_ls"' ~/.local/share/LazyChad/lsp_picker_state.json
+grep -F '"lua":"stylua"' ~/.local/share/LazyChad/formatter_picker_state.json
+grep -F '"lua":"selene"' ~/.local/share/LazyChad/lint_picker_state.json
 echo "::endgroup::"
 USER_STEPS
 

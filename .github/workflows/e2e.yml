@@ -1,0 +1,68 @@
+name: Distro end-to-end
+
+# The real user flow on a fresh container of each supported distro: package
+# install (PKGBUILD build on Arch, EPEL on Rocky), lazychad-deps as a normal
+# sudo user, doctor, stable Neovim + checksum + Nerd Font + tree-sitter,
+# pinned plugins, auto-picked tools, headless boot. Called by CI and by the
+# plugin lockfile workflow.
+on:
+  workflow_call:
+    inputs:
+      packages-artifact:
+        description: Artifact holding the built .deb/.rpm
+        type: string
+        default: packages
+      lockfile-artifact:
+        description: Optional artifact with a lazy-lock.json to test instead of the committed one
+        type: string
+        default: ''
+
+jobs:
+  distro-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ubuntu
+            image: ubuntu:latest
+          - name: debian
+            image: debian:stable
+          - name: kali
+            image: kalilinux/kali-rolling
+          - name: fedora
+            image: fedora:latest
+          - name: rocky
+            image: rockylinux/rockylinux:9
+          - name: arch
+            image: archlinux:latest
+    name: distro-e2e (${{ matrix.name }})
+    container:
+      image: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Use the lockfile under test
+        if: inputs.lockfile-artifact != ''
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.lockfile-artifact }}
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: ${{ inputs.packages-artifact }}
+          path: dist
+
+      - name: Install, set up and boot LazyChad
+        run: bash .github/scripts/distro-e2e.sh dist
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload deps log
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: lazychad-deps-log-${{ matrix.name }}${{ inputs.lockfile-artifact != '' && '-lockfile' || '' }}
+          path: /home/tester/.local/state/LazyChad/lazychad-deps.log
+          if-no-files-found: ignore

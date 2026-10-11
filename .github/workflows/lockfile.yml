@@ -1,0 +1,142 @@
+name: Plugin lockfile
+
+# Plugins are pinned by lazy-lock.json, so a broken upstream plugin release
+# can't reach users. Weekly (or on demand), update the pins to the latest
+# plugin versions, run the full distro end-to-end tests with them, and commit
+# the new lockfile to main only if everything passes. Users get it with the
+# next release.
+on:
+  schedule:
+    # weekly, Wednesday 06:23 UTC
+    - cron: '23 6 * * 3'
+  workflow_dispatch:
+
+concurrency:
+  group: plugin-lockfile
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.diff.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Neovim (stable)
+        run: bash bin/lazychad-nvim
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update all plugins and write the lockfile
+        run: |
+          mkdir -p ~/.config/LazyChad
+          cp -a init.lua lua lazy-lock.json .version ~/.config/LazyChad/
+          NVIM_APPNAME=LazyChad nvim --headless "+Lazy! update" "+qa"
+          cp ~/.config/LazyChad/lazy-lock.json lazy-lock.json
+          cat lazy-lock.json
+
+      - name: Did anything change?
+        id: diff
+        run: |
+          if git diff --quiet -- lazy-lock.json; then
+            echo "Plugins are already at their latest versions."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git --no-pager diff --stat -- lazy-lock.json
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: lockfile
+          path: lazy-lock.json
+
+  build-packages:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: lockfile
+
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install nfpm
+
+      - name: Build packages with the new lockfile
+        run: |
+          nfpm package --config nfpm.yaml --packager deb
+          nfpm package --config nfpm.yaml --packager rpm
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: packages-lockfile
+          path: |
+            *.deb
+            *.rpm
+
+  e2e:
+    needs: build-packages
+    uses: ./.github/workflows/e2e.yml
+    with:
+      packages-artifact: packages-lockfile
+      lockfile-artifact: lockfile
+
+  commit:
+    needs: [refresh, e2e]
+    if: needs.refresh.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+
+      - uses: actions/download-artifact@v7
+        with:
+          name: lockfile
+
+      - name: Commit the tested lockfile to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add lazy-lock.json
+          if git diff --cached --quiet; then
+            echo "main already has this lockfile."
+            exit 0
+          fi
+          git commit -m "chore: update pinned plugin versions" \
+            -m "Tested on every supported distro by the Plugin lockfile workflow: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          git push origin HEAD:main || { git pull --rebase origin main && git push origin HEAD:main; }
+
+  report:
+    needs: [refresh, build-packages, e2e, commit]
+    if: always() && (needs.refresh.result == 'failure' || needs.build-packages.result == 'failure' || needs.e2e.result == 'failure' || needs.commit.result == 'failure')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the "Plugin update needs attention" issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Plugin update needs attention"
+          existing="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --search "\"$title\" in:title" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --repo "$GITHUB_REPOSITORY" --body "Failed again: $RUN_URL"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --body "$(printf '%s\n\n%s\n%s' \
+              "Updating the pinned plugins failed: $RUN_URL" \
+              "The pins on main were left unchanged, so users are not affected." \
+              "Look at which distro or step failed; a plugin release probably broke something.")"
+          fi

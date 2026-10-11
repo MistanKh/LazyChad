@@ -28,6 +28,13 @@ and uninstall.
   Without a terminal (or where tag pushes are blocked), run the "Package
   Release" workflow on `main` with `version=X.Y.Z`: it creates the tag and
   release, then starts the AUR sync for that tag.
+- Plugins are pinned by `lazy-lock.json` (shipped in the packages). Don't
+  hand-edit it: the "Plugin lockfile" workflow updates it weekly, runs the
+  distro end-to-end tests with it and commits it to `main` only if they pass.
+- CI runs weekly too (schedule) and opens a "Weekly CI is failing" issue when
+  upstream breaks something; it closes itself once a run passes.
+- `lua/user/` belongs to each user (gitignored, created from
+  `templates/user/`); LazyChad code must never write into it.
 
 ## Agent History With ctx
 

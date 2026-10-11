@@ -44,7 +44,7 @@ jobs:
           chmod 600 ~/.ssh/id_aur
 
           echo "🕵️ Starting SSH Agent..."
-          eval $(ssh-agent -s)
+          eval "$(ssh-agent -s)"
           ssh-add ~/.ssh/id_aur
 
           echo "⚙️ Configuring Git..."
