@@ -28,6 +28,20 @@ local function run_next()
   local opts = req.opts or {}
   local callback = req.callback
 
+  -- opts.auto() may answer without asking (auto-pick of recommended tools).
+  -- Checked when the request reaches the front of the queue, so an "always"
+  -- choice in an earlier picker applies to the ones queued behind it.
+  if opts.auto then
+    local pick = opts.auto()
+    if pick ~= nil then
+      if callback then
+        callback(pick, true)
+      end
+      vim.schedule(run_next)
+      return
+    end
+  end
+
   local display = {}
   local header = " " .. (opts.prompt or "Select") .. " "
   display[1] = header

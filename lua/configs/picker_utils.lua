@@ -34,30 +34,84 @@ local recommendations = {
     python = "basedpyright",
     javascript = "ts_ls",
     typescript = "ts_ls",
+    javascriptreact = "ts_ls",
+    typescriptreact = "ts_ls",
+    vue = "vue_ls",
+    svelte = "svelte",
     go = "gopls",
     rust = "rust_analyzer",
+    c = "clangd",
+    cpp = "clangd",
+    java = "jdtls",
+    kotlin = "kotlin_language_server",
+    php = "intelephense",
+    ruby = "ruby_lsp",
+    elixir = "elixirls",
+    haskell = "hls",
+    zig = "zls",
+    nix = "nil_ls",
+    sh = "bashls",
+    bash = "bashls",
     html = "html",
     css = "cssls",
+    scss = "cssls",
+    less = "cssls",
     json = "jsonls",
     yaml = "yamlls",
+    toml = "taplo",
+    markdown = "marksman",
+    dockerfile = "dockerls",
+    terraform = "terraformls",
   },
   Formatter = {
     lua = "stylua",
     python = "ruff_format",
     javascript = "prettierd",
     typescript = "prettierd",
+    javascriptreact = "prettierd",
+    typescriptreact = "prettierd",
+    vue = "prettierd",
+    svelte = "prettierd",
     json = "prettierd",
+    yaml = "prettierd",
+    markdown = "prettierd",
     html = "prettierd",
+    css = "prettierd",
+    scss = "prettierd",
     go = "goimports",
     rust = "rustfmt",
+    c = "clang-format",
+    cpp = "clang-format",
+    java = "google-java-format",
+    kotlin = "ktlint",
+    php = "php_cs_fixer",
+    ruby = "rubocop",
+    nix = "nixfmt",
+    toml = "taplo",
+    sql = "sql_formatter",
     sh = "shfmt",
+    bash = "shfmt",
   },
   Linter = {
     lua = "selene",
     python = "ruff",
     javascript = "eslint_d",
     typescript = "eslint_d",
+    javascriptreact = "eslint_d",
+    typescriptreact = "eslint_d",
+    vue = "eslint_d",
+    css = "stylelint",
+    scss = "stylelint",
+    markdown = "markdownlint",
+    yaml = "yamllint",
+    json = "jsonlint",
+    dockerfile = "hadolint",
+    terraform = "tflint",
+    kotlin = "ktlint",
+    ruby = "rubocop",
+    sql = "sqlfluff",
     sh = "shellcheck",
+    bash = "shellcheck",
     go = "golangcilint",
   },
 }
@@ -136,6 +190,64 @@ local ft_mappings = {
   rust = "rust",
   python = "python",
 }
+
+-- Picker ordering. The old comparator returned true for (rec, rec), which
+-- LuaJIT's table.sort can reject with "invalid order function for sorting".
+function M.sort_recommended_first(labels)
+  table.sort(labels, function(a, b)
+    local ra = a:find("(Recommended)", 1, true) ~= nil
+    local rb = b:find("(Recommended)", 1, true) ~= nil
+    if ra ~= rb then
+      return ra
+    end
+    return a < b
+  end)
+  local first = labels[1]
+  return (first and first:find("(Recommended)", 1, true)) and first or nil
+end
+
+-- Auto-pick: true = always take the recommended tool without asking,
+-- false = always ask, nil (default) = ask, offering the "always" item.
+local settings_path = vim.fn.stdpath "data" .. "/lazychad_settings.json"
+M.AUTO_LABEL = "* Always use the recommended tools"
+
+function M.auto_pick()
+  return (M.read_json(settings_path) or {}).auto_pick
+end
+
+function M.set_auto_pick(value)
+  local settings = M.read_json(settings_path) or {}
+  settings.auto_pick = value
+  M.write_json(settings_path, settings)
+end
+
+-- Items for a picker (+ the selection_ui auto hook) given the sorted labels.
+function M.picker_items(labels, rec_label)
+  local items = {}
+  if rec_label and M.auto_pick() == nil then
+    items[#items + 1] = M.AUTO_LABEL
+  end
+  items[#items + 1] = "None"
+  vim.list_extend(items, labels)
+  local auto = rec_label and function()
+    return M.auto_pick() == true and rec_label or nil
+  end or nil
+  return items, auto
+end
+
+-- Turn the "always" item into the recommended label and announce automatic picks.
+function M.resolve_choice(choice, rec_label, auto, what, ft, command)
+  if choice == M.AUTO_LABEL then
+    M.set_auto_pick(true)
+    vim.notify "LazyChad: using recommended tools from now on (:LazyChadAutoPick off to choose yourself)"
+    return rec_label
+  end
+  if auto and choice then
+    local name = choice:gsub(" %(Recommended%)$", "")
+    vim.notify(("LazyChad: %s %s for %s (recommended; change with :%s)"):format(name, what, ft, command))
+  end
+  return choice
+end
 
 function M.on_registry_ready(callback)
   local registry_ok, registry = pcall(require, "mason-registry")

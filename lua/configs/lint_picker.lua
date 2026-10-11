@@ -132,24 +132,17 @@ function M.choose_for_filetype(ft, priority_delay)
       end
 
       -- Sort valid items, recommended first
-      table.sort(valid, function(a, b)
-        if a:find "(Recommended)" then
-          return true
-        end
-        if b:find "(Recommended)" then
-          return false
-        end
-        return a < b
-      end)
+      local rec_label = utils.sort_recommended_first(valid)
 
-      local items = { "None" }
-      vim.list_extend(items, valid)
+      local items, auto = utils.picker_items(valid, rec_label)
 
       selection_ui.select(items, {
         prompt = "Select linter for " .. ft,
         title = " Linter Picker ",
-      }, function(choice)
+        auto = auto,
+      }, function(choice, picked_automatically)
         prompting[ft] = nil
+        choice = utils.resolve_choice(choice, rec_label, picked_automatically, "linter", ft, "LintPick")
         if not choice then
           return
         end

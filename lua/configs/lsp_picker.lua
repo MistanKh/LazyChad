@@ -248,29 +248,22 @@ function M.choose_for_filetype(ft, priority_delay)
         :totable()
 
       -- Ensure recommended is at the top
-      table.sort(valid, function(a, b)
-        if a:find "(Recommended)" then
-          return true
-        end
-        if b:find "(Recommended)" then
-          return false
-        end
-        return a < b
-      end)
+      local rec_label = utils.sort_recommended_first(valid)
 
       if #valid == 0 then
         prompting[ft] = nil
         return
       end
 
-      local items = { "None" }
-      vim.list_extend(items, valid)
+      local items, auto = utils.picker_items(valid, rec_label)
 
       selection_ui.select(items, {
         prompt = "Select LSP for " .. ft,
         title = " LSP Picker ",
-      }, function(choice)
+        auto = auto,
+      }, function(choice, picked_automatically)
         prompting[ft] = nil
+        choice = utils.resolve_choice(choice, rec_label, picked_automatically, "language server", ft, "LspPick")
         if not choice then
           return
         end
@@ -384,6 +377,23 @@ function M.setup()
   vim.schedule(function()
     check_buffer(vim.api.nvim_get_current_buf())
   end)
+
+  vim.api.nvim_create_user_command("LazyChadAutoPick", function(opts)
+    local states = { on = true, off = false }
+    if states[opts.args] ~= nil then
+      utils.set_auto_pick(states[opts.args])
+    end
+    local current = utils.auto_pick()
+    local text = current == true and "on: recommended tools are picked without asking"
+      or current == false and "off: you are always asked"
+      or "not set: you are asked, with an option to always use the recommended tools"
+    vim.notify("LazyChad auto-pick " .. text)
+  end, {
+    nargs = "?",
+    complete = function()
+      return { "on", "off" }
+    end,
+  })
 
   vim.api.nvim_create_user_command("LspPick", function(opts)
     M.choose_for_filetype(opts.args ~= "" and opts.args or vim.bo.filetype)
