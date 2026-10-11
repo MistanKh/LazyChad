@@ -129,4 +129,10 @@ M.ui = {
   },
 }
 
+-- Your overrides (theme, ...) from lua/user/chadrc.lua win over the above
+local ok, user = pcall(require, "user.chadrc")
+if ok and type(user) == "table" then
+  M = vim.tbl_deep_extend("force", M, user)
+end
+
 return M

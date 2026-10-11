@@ -6,8 +6,8 @@ undo/
 swap/
 backup/
 
-# Lazy.nvim
-/lazy-lock.json
+# Each user's own settings (lua/user/ is created from templates/user)
+/lua/user/
 
 # LazyChad State (private choices)
 *_picker_state.json

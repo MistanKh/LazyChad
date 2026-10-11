@@ -40,7 +40,7 @@ touch "$tmp/home/.config/LazyChad/init.lua"
 run_lchad --bootstrap </dev/null >/dev/null 2>&1
 assert_eq "$(grep -c "dofile(\[\[$tmp/sys/lua/configs/bootstrap.lua\]\]).run() +cquit 1" "$tmp/nvim.log")" "1" \
     "stale config: bootstrap falls back to the packaged copy and ends with cquit"
-assert_eq "$(grep -c '^--headless +Lazy! sync +qa$' "$tmp/nvim.log")" "1" "plugin sync always ends with +qa"
+assert_eq "$(grep -c '^--headless +Lazy! restore +Lazy! clean +qa$' "$tmp/nvim.log")" "1" "plugins restored to the pinned versions, then quit"
 
 # with an up-to-date user config, its own bootstrap.lua is used
 touch "$tmp/home/.config/LazyChad/lua/configs/bootstrap.lua"
@@ -61,9 +61,29 @@ run_lchad --version </dev/null >/dev/null 2>&1
 assert_eq "$([ -d "$tmp/home/.local/share/LazyChad/lazy" ] && [ ! -e "$tmp/home/.local/share/LazyChad.pkg-upgrade" ] && echo yes)" "yes" \
     "stashed data from an interrupted upgrade is restored"
 
-# version_ok
+# version_ok and the user folder (sourced, with a fake config dir)
 # shellcheck source=/dev/null
 source "$LCHAD"
+uf="$(mktemp -d)"
+mkdir -p "$uf/sys/templates/user/plugins" "$uf/sys/lua"
+echo "1.0.12" > "$uf/sys/.version"; touch "$uf/sys/init.lua"
+echo "-- template" > "$uf/sys/templates/user/init.lua"
+export LAZYCHAD_DIR="$uf/cfg" SYSTEM_DIR="$uf/sys" HOME="$uf/home"
+seed_config 2>/dev/null
+assert_eq "$(cat "$uf/cfg/lua/user/init.lua")" "-- template" "first run creates lua/user from the template"
+echo "-- mine" > "$uf/cfg/lua/user/init.lua"
+echo "1.0.11" > "$uf/cfg/.version"
+echo "-- old core edit" > "$uf/cfg/init.lua"
+is_tty() { return 0; }
+confirm_yes() { return 0; }
+REFRESHED=false
+seed_config 2>/dev/null
+assert_eq "$(cat "$uf/cfg/lua/user/init.lua")" "-- mine" "refresh keeps lua/user"
+assert_eq "$(cat "$uf/cfg/.version")" "1.0.12" "refresh installs the new version"
+assert_eq "$REFRESHED" "true" "refresh asks for the pinned plugins to be restored"
+assert_eq "$(cat "$uf"/cfg_backup_*/init.lua)" "-- old core edit" "other edits go to the backup"
+command rm -rf "${uf:?}"
+
 assert_eq "$(version_ok 0.12.5 && echo yes || echo no)" "yes" "version_ok 0.12.5"
 assert_eq "$(version_ok 0.13 && echo yes || echo no)"   "yes" "version_ok 0.13"
 assert_eq "$(version_ok 1.0.0 && echo yes || echo no)"  "yes" "version_ok 1.0.0"

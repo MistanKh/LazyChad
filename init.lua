@@ -20,7 +20,7 @@ vim.opt.rtp:prepend(lazypath)
 local lazy_config = require "configs.lazy"
 
 -- load plugins
-require("lazy").setup({
+local specs = {
   {
     "NvChad/NvChad",
     lazy = false,
@@ -29,7 +29,14 @@ require("lazy").setup({
   },
 
   { import = "plugins" },
-}, lazy_config)
+}
+
+-- Your own plugins: lua/user/plugins/*.lua (never overwritten by LazyChad)
+if vim.uv.fs_stat(vim.fn.stdpath "config" .. "/lua/user/plugins") then
+  table.insert(specs, { import = "user.plugins" })
+end
+
+require("lazy").setup(specs, lazy_config)
 
 -- load theme
 pcall(function()
@@ -51,4 +58,10 @@ end)
 
 vim.schedule(function()
   pcall(require, "mappings")
+
+  -- Your own settings and keymaps: lua/user/init.lua, loaded last so it wins
+  local ok, err = pcall(require, "user")
+  if not ok and not tostring(err):find("module 'user' not found", 1, true) then
+    vim.notify("LazyChad: error in lua/user/init.lua:\n" .. tostring(err), vim.log.levels.ERROR)
+  end
 end)

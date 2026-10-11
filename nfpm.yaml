@@ -32,6 +32,12 @@ contents:
     dst: /usr/share/lazychad/lua
   - src: ./.version
     dst: /usr/share/lazychad/.version
+  # Tested plugin versions (refreshed by the "Plugin lockfile" workflow)
+  - src: ./lazy-lock.json
+    dst: /usr/share/lazychad/lazy-lock.json
+  # Starting point for each user's lua/user/ folder
+  - src: ./templates
+    dst: /usr/share/lazychad/templates
   
   # Metadata
   - src: ./README.md

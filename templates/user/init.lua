@@ -1,0 +1,13 @@
+-- Your LazyChad customizations.
+--
+-- This folder (lua/user/) is yours: LazyChad never overwrites it, including
+-- when it refreshes your config after an upgrade.
+--
+--   lua/user/init.lua        options, keymaps, autocmds (loaded last, so they win)
+--   lua/user/plugins/*.lua   extra plugins, as lazy.nvim specs
+--   lua/user/chadrc.lua      NvChad settings merged over LazyChad's (theme, ...)
+--
+-- Examples:
+-- vim.opt.relativenumber = true
+-- vim.opt.wrap = true
+-- vim.keymap.set("n", "<leader>w", "<cmd>w<cr>", { desc = "Save file" })

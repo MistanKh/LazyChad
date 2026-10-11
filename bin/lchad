@@ -76,6 +76,21 @@ copy_system_config() {
     chmod -R u+rw "$LAZYCHAD_DIR"
 }
 
+ensure_user_dir() {
+    # lua/user/ holds the user's own settings, keymaps and plugins; LazyChad
+    # never overwrites it. Create it from the template on first use.
+    local tpl
+    [ -d "$LAZYCHAD_DIR/lua/user" ] && return 0
+    [ -f "$LAZYCHAD_DIR/init.lua" ] || return 0
+    for tpl in "$LAZYCHAD_DIR/templates/user" "$SYSTEM_DIR/templates/user"; do
+        if [ -d "$tpl" ]; then
+            mkdir -p "$LAZYCHAD_DIR/lua"
+            cp -R "$tpl" "$LAZYCHAD_DIR/lua/user" && chmod -R u+rw "$LAZYCHAD_DIR/lua/user"
+            return 0
+        fi
+    done
+}
+
 restore_upgrade_stash() {
     # The package's pre-install hook moves these aside during an upgrade and its
     # post-install hook moves them back. If that was interrupted, finish it here.
@@ -88,6 +103,8 @@ restore_upgrade_stash() {
     done
 }
 
+REFRESHED=false
+
 seed_config() {
     # First-time setup, or offer a refresh when the packaged version changed.
     restore_upgrade_stash
@@ -95,6 +112,7 @@ seed_config() {
         if [ -d "$SYSTEM_DIR" ]; then
             echo "📦 Initializing LazyChad configuration from $SYSTEM_DIR..." >&2
             copy_system_config
+            ensure_user_dir
             return 0
         fi
         echo -e "${RED}❌ Error: LazyChad configuration not found in $LAZYCHAD_DIR${NC}" >&2
@@ -103,6 +121,7 @@ seed_config() {
         return 1
     fi
 
+    ensure_user_dir
     [ -f "$SYSTEM_DIR/.version" ] || return 0
     local sys_ver user_ver backup
     sys_ver="$(tr -d '[:space:]' < "$SYSTEM_DIR/.version")"
@@ -114,16 +133,22 @@ seed_config() {
         echo "Run 'lchad' in a terminal to refresh your local configuration." >&2
         return 0
     fi
-    echo "Your local configuration is out of date." >&2
-    read -p "Do you want to refresh your local configuration? (y/N) " -n 1 -r
-    echo >&2
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "Refreshing installs the new LazyChad files and its tested plugin versions." >&2
+    echo "Your lua/user/ folder is kept; anything else you changed is backed up." >&2
+    if confirm_yes "Refresh your LazyChad configuration now?"; then
         backup="${LAZYCHAD_DIR}_backup_$(date +%Y%m%d_%H%M%S)"
         echo "🗄️ Backing up current config to $backup..." >&2
         mv "$LAZYCHAD_DIR" "$backup"
         echo "📦 Syncing new version v$sys_ver..." >&2
         copy_system_config
-        echo "✅ Sync complete. You can find your old files in $backup" >&2
+        if [ -d "$backup/lua/user" ]; then
+            rm -rf "${LAZYCHAD_DIR:?}/lua/user"
+            cp -a "$backup/lua/user" "$LAZYCHAD_DIR/lua/user"
+            echo "👤 Kept your lua/user/ settings." >&2
+        fi
+        ensure_user_dir
+        REFRESHED=true
+        echo "✅ Sync complete. Your previous config is in $backup" >&2
     fi
 }
 
@@ -165,9 +190,11 @@ bootstrap_lua() {
 
 run_bootstrap() {
     local lua_file
-    echo -e "${BLUE}📦 Installing LazyChad plugins (one-time setup)...${NC}" >&2
+    echo -e "${BLUE}📦 Installing LazyChad plugins at their tested versions...${NC}" >&2
+    # Plugins are pinned by lazy-lock.json: restore puts installed plugins on
+    # the pinned commits (new ones install at them), clean drops unused ones.
     # Every headless call ends with a quit, so an error can never leave it hanging.
-    if ! "$NVIM" --headless "+Lazy! sync" "+qa"; then
+    if ! "$NVIM" --headless "+Lazy! restore" "+Lazy! clean" "+qa"; then
         echo -e "${RED}⚠️ Plugin install failed (network?). Re-run 'lchad --bootstrap'.${NC}" >&2
         return 1
     fi
@@ -329,8 +356,9 @@ main() {
     if ! version_ok "$v"; then
         echo -e "${YELLOW}⚠️  Neovim ${v:-unknown} detected, but LazyChad needs ${MIN_NVIM_MAJOR}.${MIN_NVIM_MINOR}+.${NC}" >&2
         echo -e "${YELLOW}    Run 'lazychad-nvim' to install the latest stable Neovim. Continuing anyway...${NC}" >&2
-    elif ! plugins_installed && is_tty; then
-        # First launch: install everything up front, so the editor opens ready.
+    elif { ! plugins_installed || [ "$REFRESHED" = true ]; } && is_tty; then
+        # First launch, or a refresh to new pinned plugin versions: set
+        # everything up front, so the editor opens ready.
         run_bootstrap || echo -e "${YELLOW}Continuing; lazy.nvim will retry on launch.${NC}" >&2
     fi
 

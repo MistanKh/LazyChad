@@ -39,7 +39,7 @@ package() {
 
   # Install the Neovim configuration files
   install -dm755 "$pkgdir/usr/share/lazychad"
-  cp -a init.lua lua .version "$pkgdir/usr/share/lazychad/"
+  cp -a init.lua lua .version lazy-lock.json templates "$pkgdir/usr/share/lazychad/"
 
   # Install documentation and license
   install -Dm644 README.md "$pkgdir/usr/share/doc/lazychad/README.md"
