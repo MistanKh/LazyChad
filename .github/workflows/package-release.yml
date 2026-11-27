@@ -13,16 +13,20 @@ on:
         description: 'Version to release (X.Y.Z; must match .version on the selected branch)'
         required: true
 
-permissions:
-  contents: write
-  actions: write
+permissions: {}
 
 jobs:
   build-packages:
     runs-on: ubuntu-latest
+    permissions:
+      # Create the release (and the workflow_dispatch tag) and start AUR sync.
+      contents: write
+      actions: write
     steps:
       - name: Checkout Code
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Resolve tag
         id: tag
@@ -56,7 +60,7 @@ jobs:
         run: nfpm package --config nfpm.yaml --packager rpm
 
       - name: Generate checksums
-        run: sha256sum *.deb *.rpm > SHA256SUMS && cat SHA256SUMS
+        run: sha256sum ./*.deb ./*.rpm > SHA256SUMS && cat SHA256SUMS
 
       - name: Release notes
         env:
@@ -66,7 +70,7 @@ jobs:
           if [ -f "$notes" ]; then cp "$notes" release-notes.md; else : > release-notes.md; fi
 
       - name: Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           target_commitish: ${{ github.sha }}
