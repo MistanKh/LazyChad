@@ -152,8 +152,12 @@ jobs:
           mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy
           touch /home/tester/.config/LazyChad/mine.lua
           # -U --replacepkgs works for both a same-version reinstall and a real
-          # upgrade; either way the old package's wiping %postun runs
-          rpm -Uvh --replacepkgs ./lazychad-*.rpm 2>&1 | tee /tmp/upgrade.log
+          # upgrade; either way the old package's wiping %postun runs.
+          # Fedora 45 refuses an unsigned package unless this command opts out.
+          # The opt-out is only for the package this workflow just built.
+          # Digest checks still run. The published v1.0.9 rpm above is
+          # checksummed and is not installed with --nosignature.
+          rpm -Uvh --replacepkgs --nosignature ./lazychad-*.rpm 2>&1 | tee /tmp/upgrade.log
           grep -F "Cleaning up LazyChad user directories" /tmp/upgrade.log
           test "$(rpm -q lazychad)" = "$(rpm -qp ./lazychad-*.rpm)"
           test -f /home/tester/.config/LazyChad/mine.lua
