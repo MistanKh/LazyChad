@@ -8,11 +8,16 @@ on:
     # weekly, Monday 06:17 UTC
     - cron: '17 6 * * 1'
 
+permissions:
+  contents: read
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Shell syntax
         # `bash -n a b c` only checks a; check each file.
@@ -31,7 +36,7 @@ jobs:
         run: bash scripts/check-version.sh
 
       - name: StyLua
-        uses: JohnnyMorganz/stylua-action@v4
+        uses: JohnnyMorganz/stylua-action@479972f01e665acfcba96ada452c36608bdbbb5e # v4.1.0
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version: 2.5.2
@@ -40,7 +45,9 @@ jobs:
   build-packages:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Install nfpm
         run: |
@@ -53,7 +60,7 @@ jobs:
           nfpm package --config nfpm.yaml --packager deb
           nfpm package --config nfpm.yaml --packager rpm
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: packages
           path: |
@@ -68,7 +75,7 @@ jobs:
     container:
       image: debian:stable
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: packages
 
@@ -80,8 +87,11 @@ jobs:
           set -eo pipefail
           apt-get update
           apt-get install -y curl ca-certificates
+          # sha256 digest of the v1.0.9 release asset on GitHub.
+          deb_sha256=21ae520af1c7e310d6c00a9dbc00cb459e0040d68ba752ab0464a9bbf9a45fb4
           curl -fsSL -o /tmp/lazychad-1.0.9.deb \
             https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad_1.0.9-1_all.deb
+          echo "${deb_sha256}  /tmp/lazychad-1.0.9.deb" | sha256sum -c -
           apt-get install -y /tmp/lazychad-1.0.9.deb
           mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy /root/.config/LazyChad
           touch /home/tester/.config/LazyChad/mine.lua /root/.config/LazyChad/mine.lua
@@ -124,7 +134,7 @@ jobs:
     container:
       image: fedora:latest
     steps:
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: packages
 
@@ -132,7 +142,13 @@ jobs:
         shell: bash
         run: |
           set -eo pipefail
-          dnf install -y https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad-1.0.9-1.noarch.rpm
+          dnf install -y curl ca-certificates
+          # sha256 digest of the v1.0.9 release asset on GitHub.
+          rpm_sha256=7940349100d2f9cedc1701e3d8e419c67c70fc0aa0d222ac17d8f4b5293238b6
+          curl -fsSL -o /tmp/lazychad-1.0.9-1.noarch.rpm \
+            https://github.com/MistanKh/LazyChad/releases/download/v1.0.9/lazychad-1.0.9-1.noarch.rpm
+          echo "${rpm_sha256}  /tmp/lazychad-1.0.9-1.noarch.rpm" | sha256sum -c -
+          dnf install -y /tmp/lazychad-1.0.9-1.noarch.rpm
           mkdir -p /home/tester/.config/LazyChad /home/tester/.local/share/LazyChad/lazy
           touch /home/tester/.config/LazyChad/mine.lua
           # -U --replacepkgs works for both a same-version reinstall and a real

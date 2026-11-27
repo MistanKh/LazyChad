@@ -17,6 +17,9 @@ on:
         type: string
         default: ''
 
+permissions:
+  contents: read
+
 jobs:
   distro-e2e:
     runs-on: ubuntu-latest
@@ -41,15 +44,17 @@ jobs:
     container:
       image: ${{ matrix.image }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false
 
       - name: Use the lockfile under test
         if: inputs.lockfile-artifact != ''
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: ${{ inputs.lockfile-artifact }}
 
-      - uses: actions/download-artifact@v7
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: ${{ inputs.packages-artifact }}
           path: dist
@@ -61,7 +66,7 @@ jobs:
 
       - name: Upload deps log
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: lazychad-deps-log-${{ matrix.name }}${{ inputs.lockfile-artifact != '' && '-lockfile' || '' }}
           path: /home/tester/.local/state/LazyChad/lazychad-deps.log
